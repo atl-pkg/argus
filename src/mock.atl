@@ -1,27 +1,50 @@
-// mock — lightweight mocking and spy utilities
+// mock — spies, stubs, and call verification
 //
-// Spies wrap a function and record every call (args, return value, call count).
-// Mocks replace a function with a controlled stub that returns a preset value
-// or executes a custom implementation.
+// Spies wrap a function and record every call. Stubs replace functions with
+// controlled implementations. All mocks track call counts and return values.
 //
 // Usage:
-//   import { spy, stub } from 'argus';
+//   import { spy, spy1, stub, stub_seq, stub_fn, verify } from 'argus';
 //
-//   let s = spy(fn(x: number): number { return x * 2; });
-//   s.fn(3);
-//   test.equal(s.call_count(), 1);
-//   test.equal(s.last_return(), 6);
+//   // Zero-arg spy
+//   let s = spy(fn(): number { return computeAnswer(); });
+//   s.fn();
+//   expect(s.call_count()).toEqual(1);
+//   expect(s.last_return()).toEqual(42);
 //
-//   let m = stub(42);        // always returns 42
-//   test.equal(m.fn(), 42);
+//   // One-arg spy (captures input too)
+//   let s1 = spy1(fn(x: number): number { return x * 2; });
+//   s1.fn(5);
+//   expect(s1.last_arg()).toEqual(5);
+//   expect(s1.last_return()).toEqual(10);
+//
+//   // Stubs
+//   let m = stub(42);          // always returns 42
+//   let seq = stub_seq([1,2,3]); // returns 1, 2, 3, 3, 3...
+//   let custom = stub_fn(fn(): string { return "dynamic"; });
+//
+//   // Verify expectations
+//   verify(s).calledTimes(3);
+//   verify(s).calledAtLeast(1);
+//   verify(s).neverCalled();
+
+// ── Call record ────────────────────────────────────────────────────────────
 
 export struct Call {
     index: number,
     returned: any,
 }
 
+export struct Call1 {
+    index: number,
+    arg: any,
+    returned: any,
+}
+
+// ── Spy (0-arg) ───────────────────────────────────────────────────────────
+
 export struct Spy {
-    fn: any,
+    fn: fn(): any,
     calls: Call[],
 }
 
@@ -34,15 +57,29 @@ impl Spy {
         return self.calls.length() > 0;
     }
 
+    fn never_called(borrow self): bool {
+        return self.calls.length() == 0;
+    }
+
     fn last_return(borrow self): any {
         let len = self.calls.length();
-        test.assert(len > 0, "spy was never called");
+        test.assert(len > 0, "spy was never called — no last_return");
         return self.calls[len - 1].returned;
     }
 
     fn nth_return(borrow self, n: number): any {
-        test.assert(n < self.calls.length(), "spy call index out of range");
+        test.assert(n >= 0 && n < self.calls.length(), "spy call index out of range: " + n.string());
         return self.calls[n].returned;
+    }
+
+    fn returns(borrow self): any[] {
+        let mut out: any[] = [];
+        let mut i = 0;
+        while i < self.calls.length() {
+            out = out.push(self.calls[i].returned);
+            i = i + 1;
+        }
+        return out;
     }
 
     fn reset(borrow self): Spy {
@@ -50,21 +87,90 @@ impl Spy {
     }
 }
 
-// spy wraps a 0-arg function. For typed spies, callers wrap their own fn
-// and pass the Spy's recorder as the outer fn.
 export fn spy(target: fn(): any): Spy {
     let mut calls: Call[] = [];
     let mut idx = 0;
-
     let wrapper = fn(): any {
         let result = target();
         calls = calls.push(Call { index: idx, returned: result });
         idx = idx + 1;
         return result;
     };
-
     return Spy { fn: wrapper, calls: calls };
 }
+
+// ── Spy1 (1-arg) ──────────────────────────────────────────────────────────
+
+export struct Spy1 {
+    fn: fn(arg: any): any,
+    calls: Call1[],
+}
+
+impl Spy1 {
+    fn call_count(borrow self): number {
+        return self.calls.length();
+    }
+
+    fn was_called(borrow self): bool {
+        return self.calls.length() > 0;
+    }
+
+    fn last_arg(borrow self): any {
+        let len = self.calls.length();
+        test.assert(len > 0, "spy1 was never called — no last_arg");
+        return self.calls[len - 1].arg;
+    }
+
+    fn last_return(borrow self): any {
+        let len = self.calls.length();
+        test.assert(len > 0, "spy1 was never called — no last_return");
+        return self.calls[len - 1].returned;
+    }
+
+    fn args(borrow self): any[] {
+        let mut out: any[] = [];
+        let mut i = 0;
+        while i < self.calls.length() {
+            out = out.push(self.calls[i].arg);
+            i = i + 1;
+        }
+        return out;
+    }
+
+    fn nth_call(borrow self, n: number): Call1 {
+        test.assert(n >= 0 && n < self.calls.length(), "spy1 call index out of range: " + n.string());
+        return self.calls[n];
+    }
+
+    fn called_with(borrow self, arg: any): bool {
+        let mut i = 0;
+        while i < self.calls.length() {
+            if self.calls[i].arg == arg {
+                return true;
+            }
+            i = i + 1;
+        }
+        return false;
+    }
+
+    fn reset(borrow self): Spy1 {
+        return Spy1 { fn: self.fn, calls: [] };
+    }
+}
+
+export fn spy1(target: fn(arg: any): any): Spy1 {
+    let mut calls: Call1[] = [];
+    let mut idx = 0;
+    let wrapper = fn(arg: any): any {
+        let result = target(arg);
+        calls = calls.push(Call1 { index: idx, arg: arg, returned: result });
+        idx = idx + 1;
+        return result;
+    };
+    return Spy1 { fn: wrapper, calls: calls };
+}
+
+// ── Stub ──────────────────────────────────────────────────────────────────
 
 export struct Stub {
     fn: fn(): any,
@@ -75,9 +181,13 @@ impl Stub {
     fn was_called(borrow self): bool {
         return self.call_count > 0;
     }
+
+    fn never_called(borrow self): bool {
+        return self.call_count == 0;
+    }
 }
 
-// stub creates a function that always returns the given value.
+// stub — always returns the given value.
 export fn stub(value: any): Stub {
     let mut count = 0;
     let f = fn(): any {
@@ -87,19 +197,88 @@ export fn stub(value: any): Stub {
     return Stub { fn: f, call_count: count };
 }
 
-// stub_seq creates a function that returns values from a sequence in order,
-// cycling back to the last value when the sequence is exhausted.
+// stub_seq — returns values in order, then repeats the last.
 export fn stub_seq(values: any[]): Stub {
-    test.assert(values.length() > 0, "stub_seq requires at least one value");
+    test.assert(values.length() > 0, "stub_seq: requires at least one value");
     let mut idx = 0;
     let mut count = 0;
+    let last = values.length() - 1;
     let f = fn(): any {
         let v = values[idx];
-        if idx < values.length() - 1 {
+        if idx < last {
             idx = idx + 1;
         }
         count = count + 1;
         return v;
     };
     return Stub { fn: f, call_count: count };
+}
+
+// stub_fn — custom implementation, call-counted.
+export fn stub_fn(impl_fn: fn(): any): Stub {
+    let mut count = 0;
+    let f = fn(): any {
+        count = count + 1;
+        return impl_fn();
+    };
+    return Stub { fn: f, call_count: count };
+}
+
+// ── Verify ────────────────────────────────────────────────────────────────
+// Fluent call-count assertions on any spy/stub.
+// Accepts Spy, Spy1, or Stub via any (duck-typed).
+
+export struct Verify {
+    subject: any,
+    label: string,
+}
+
+impl Verify {
+    fn calledTimes(borrow self, n: number): Verify {
+        let count = self.subject.call_count();
+        test.assert(
+            count == n,
+            self.label + ": expected " + n.string() + " calls, got " + count.string(),
+        );
+        return self;
+    }
+
+    fn calledAtLeast(borrow self, n: number): Verify {
+        let count = self.subject.call_count();
+        test.assert(
+            count >= n,
+            self.label + ": expected at least " + n.string() + " calls, got " + count.string(),
+        );
+        return self;
+    }
+
+    fn calledAtMost(borrow self, n: number): Verify {
+        let count = self.subject.call_count();
+        test.assert(
+            count <= n,
+            self.label + ": expected at most " + n.string() + " calls, got " + count.string(),
+        );
+        return self;
+    }
+
+    fn neverCalled(borrow self): Verify {
+        let count = self.subject.call_count();
+        test.assert(
+            count == 0,
+            self.label + ": expected 0 calls, got " + count.string(),
+        );
+        return self;
+    }
+
+    fn calledOnce(borrow self): Verify {
+        return self.calledTimes(1);
+    }
+}
+
+export fn verify(subject: any): Verify {
+    return Verify { subject: subject, label: "mock" };
+}
+
+export fn verifyAs(subject: any, label: string): Verify {
+    return Verify { subject: subject, label: label };
 }

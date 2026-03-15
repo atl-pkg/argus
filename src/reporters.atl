@@ -1,38 +1,109 @@
-// reporters — output formatters for Argus suite results
+// reporters — pluggable output formatters for Argus suite results
 //
-// Pluggable reporters consume SuiteResult[] and produce output.
-// Built-in: pretty (human), dot (CI compact), json (machine).
+// Four built-in reporters: pretty (human), dot (compact CI), tap (TAP v13),
+// json_report (machine-readable). All consume SuiteResult[].
 //
 // Usage:
-//   import { run } from 'argus';
-//   import { pretty, dot, json_report } from 'argus';
-//
+//   import { run, pretty } from 'argus';
 //   let results = run();
-//   pretty(results);    // colored human output
-//   dot(results);       // one dot per test (CI-friendly)
-//   json_report(results); // JSON to stdout
+//   pretty(results);
+//
+// TAP output is compatible with any TAP consumer (tap-reporter, prove, etc.)
 
 import { SuiteResult, Failure } from "./suite";
 
-// ── Pretty ─────────────────────────────────────────────────────────────────
+// ── Summary aggregation ────────────────────────────────────────────────────
 
-fn _pad(s: string, width: number): string {
-    let mut out = s;
-    while out.length() < width {
-        out = out + " ";
-    }
-    return out;
+export struct RunSummary {
+    passed: number,
+    failed: number,
+    skipped: number,
+    duration_ms: number,
+    all_passed: bool,
 }
 
-export fn pretty(results: SuiteResult[]): void {
-    let mut total_passed = 0;
-    let mut total_failed = 0;
-    let mut total_skipped = 0;
+export fn summarize(results: SuiteResult[]): RunSummary {
+    let mut passed = 0;
+    let mut failed = 0;
+    let mut skipped = 0;
+    let mut duration = 0;
+    let mut i = 0;
+    while i < results.length() {
+        passed = passed + results[i].passed;
+        failed = failed + results[i].failed;
+        skipped = skipped + results[i].skipped;
+        duration = duration + results[i].duration_ms;
+        i = i + 1;
+    }
+    return RunSummary {
+        passed: passed,
+        failed: failed,
+        skipped: skipped,
+        duration_ms: duration,
+        all_passed: failed == 0,
+    };
+}
 
+// ── Pretty ─────────────────────────────────────────────────────────────────
+//
+// Human-readable output with suite tree, failures, and totals.
+//
+//   UserService
+//     ✗ creates a user — assertion failed
+//
+//   ──────────────────────────────────────
+//   passed: 4  failed: 1  skipped: 0  (12ms)
+//   FAIL
+
+export fn pretty(results: SuiteResult[]): void {
+    let mut i = 0;
+    while i < results.length() {
+        let r = results[i];
+        console.log("\n  " + r.name + "  (" + r.duration_ms.string() + "ms)");
+
+        let mut j = 0;
+        while j < r.failures.length() {
+            let f = r.failures[j];
+            console.log("    ✗ " + f.case_name);
+            console.log("      " + f.message);
+            j = j + 1;
+        }
+        i = i + 1;
+    }
+
+    let s = summarize(results);
+    console.log("\n  ──────────────────────────────────────────");
+    console.log(
+        "  passed: " + s.passed.string() +
+        "  failed: " + s.failed.string() +
+        "  skipped: " + s.skipped.string() +
+        "  (" + s.duration_ms.string() + "ms)"
+    );
+    if s.all_passed {
+        console.log("  PASS");
+    } else {
+        console.log("  FAIL");
+    }
+}
+
+// ── Verbose ────────────────────────────────────────────────────────────────
+//
+// Like pretty, but prints every test case name (pass or fail).
+// Useful when debugging which tests are being collected.
+
+export fn verbose(results: SuiteResult[]): void {
     let mut i = 0;
     while i < results.length() {
         let r = results[i];
         console.log("\n  " + r.name);
+
+        // Print passes
+        let mut pass_count = r.passed;
+        let mut k = 0;
+        while k < pass_count {
+            console.log("    ✓ (passed)");
+            k = k + 1;
+        }
 
         let mut j = 0;
         while j < r.failures.length() {
@@ -40,33 +111,22 @@ export fn pretty(results: SuiteResult[]): void {
             console.log("    ✗ " + f.case_name + " — " + f.message);
             j = j + 1;
         }
-
-        total_passed = total_passed + r.passed;
-        total_failed = total_failed + r.failed;
-        total_skipped = total_skipped + r.skipped;
         i = i + 1;
     }
 
-    console.log("\n─────────────────────────────────────");
-    console.log(
-        "  passed:  " + total_passed.string() +
-        "  failed: " + total_failed.string() +
-        "  skipped: " + total_skipped.string()
-    );
-
-    if total_failed > 0 {
-        console.log("  FAIL");
-    } else {
-        console.log("  PASS");
-    }
+    let s = summarize(results);
+    console.log("\n  passed: " + s.passed.string() + "  failed: " + s.failed.string());
 }
 
 // ── Dot ────────────────────────────────────────────────────────────────────
+//
+// One character per test. . = pass, F = fail, S = skip. Fits wide CI logs.
+//
+//   .....F..S.
+//   FAIL (1 failure)
 
 export fn dot(results: SuiteResult[]): void {
     let mut line = "";
-    let mut total_failed = 0;
-
     let mut i = 0;
     while i < results.length() {
         let r = results[i];
@@ -85,22 +145,87 @@ export fn dot(results: SuiteResult[]): void {
             line = line + "S";
             s = s + 1;
         }
-        total_failed = total_failed + r.failed;
         i = i + 1;
     }
-
     console.log(line);
-    if total_failed > 0 {
-        console.log("FAIL (" + total_failed.string() + " failures)");
+
+    let sum = summarize(results);
+    if sum.all_passed {
+        console.log("ok (" + sum.passed.string() + " passed, " + sum.duration_ms.string() + "ms)");
     } else {
-        console.log("ok");
+        console.log("FAIL (" + sum.failed.string() + " failures)");
+    }
+}
+
+// ── TAP v13 ────────────────────────────────────────────────────────────────
+//
+// TAP (Test Anything Protocol) v13. Compatible with tap-reporter, prove, etc.
+//
+//   TAP version 13
+//   1..5
+//   ok 1 - UserService › creates a user
+//   not ok 2 - UserService › validates email
+//     ---
+//     message: assertion failed
+//     ...
+//   ok 3 - Math › adds
+
+export fn tap(results: SuiteResult[]): void {
+    let sum = summarize(results);
+    let total = sum.passed + sum.failed + sum.skipped;
+
+    console.log("TAP version 13");
+    console.log("1.." + total.string());
+
+    let mut test_num = 1;
+    let mut i = 0;
+    while i < results.length() {
+        let r = results[i];
+
+        // Passed tests
+        let mut p = 0;
+        while p < r.passed {
+            console.log("ok " + test_num.string() + " - " + r.name + " (passed)");
+            test_num = test_num + 1;
+            p = p + 1;
+        }
+
+        // Failed tests
+        let mut j = 0;
+        while j < r.failures.length() {
+            let f = r.failures[j];
+            console.log("not ok " + test_num.string() + " - " + r.name + " › " + f.case_name);
+            console.log("  ---");
+            console.log("  message: " + f.message);
+            console.log("  suite: " + f.suite);
+            console.log("  ...");
+            test_num = test_num + 1;
+            j = j + 1;
+        }
+
+        // Skipped
+        let mut s = 0;
+        while s < r.skipped {
+            console.log("ok " + test_num.string() + " - " + r.name + " # SKIP");
+            test_num = test_num + 1;
+            s = s + 1;
+        }
+
+        i = i + 1;
     }
 }
 
 // ── JSON ───────────────────────────────────────────────────────────────────
+//
+// Full machine-readable output. Suitable for CI dashboards and post-processing.
 
 export fn json_report(results: SuiteResult[]): void {
-    let encoded = Json.stringify(results);
+    let sum = summarize(results);
+    let payload = {
+        summary: sum,
+        suites: results,
+    };
+    let encoded = Json.stringify(payload);
     match encoded {
         Ok(s) => console.log(s),
         Err(e) => console.log('{"error":"' + e + '"}'),

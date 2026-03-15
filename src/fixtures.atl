@@ -1,0 +1,85 @@
+// fixtures — shared test fixture factories
+//
+// A Fixture<T> wraps a factory function that builds a fresh value for each test.
+// Fixtures integrate with beforeEach — call fixture.setup() in a beforeEach hook
+// and fixture.value() inside each it() block.
+//
+// Fixtures are the Argus answer to shared test state without global mutation:
+// each test gets a fresh instance built by the factory.
+//
+// Usage:
+//   import { fixture, Fixture } from 'argus';
+//
+//   describe("UserService", fn(): void {
+//       let db = fixture(fn(): string { return "empty_db"; });
+//
+//       beforeEach(fn(): void { db.setup(); });
+//
+//       it("reads state", fn(): void {
+//           test.equal(db.value(), "empty_db");
+//       });
+//   });
+//
+// For fixtures that need teardown:
+//   let conn = fixtureWithTeardown(
+//       fn(): string { return openConnection(); },
+//       fn(c: any): void { closeConnection(c); },
+//   );
+//   beforeEach(fn(): void { conn.setup(); });
+//   afterEach(fn(): void  { conn.teardown(); });
+
+export struct Fixture {
+    build: fn(): any,
+    teardown_fn: fn(v: any): void,
+    _current: any,
+    _ready: bool,
+}
+
+impl Fixture {
+    // setup — call in beforeEach to build a fresh value.
+    fn setup(borrow self): void {
+        self._current = self.build();
+        self._ready = true;
+    }
+
+    // value — call inside it() to access the current fixture value.
+    fn value(borrow self): any {
+        test.assert(self._ready, "fixture.value() called before fixture.setup() — did you add setup() to beforeEach?");
+        return self._current;
+    }
+
+    // teardown — call in afterEach if the fixture needs cleanup.
+    fn teardown(borrow self): void {
+        if self._ready {
+            self.teardown_fn(self._current);
+            self._ready = false;
+        }
+    }
+
+    // reset — manually clear the current value.
+    fn reset(borrow self): void {
+        self._ready = false;
+    }
+}
+
+fn _no_teardown(v: any): void {}
+
+// fixture — builds a fresh value before each test. No teardown.
+export fn fixture(factory: fn(): any): Fixture {
+    return Fixture {
+        build: factory,
+        teardown_fn: _no_teardown,
+        _current: "",
+        _ready: false,
+    };
+}
+
+// fixtureWithTeardown — like fixture, but calls teardown_fn(value) in afterEach.
+export fn fixtureWithTeardown(factory: fn(): any, teardown: fn(v: any): void): Fixture {
+    return Fixture {
+        build: factory,
+        teardown_fn: teardown,
+        _current: "",
+        _ready: false,
+    };
+}
