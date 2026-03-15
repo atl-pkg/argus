@@ -11,7 +11,10 @@
 //   __snapshots__/<name>.snap
 
 fn _serialize(value: any): string {
-    return Json.stringify(value);
+    match Json.stringify(value) {
+        Ok(s) => { return s; },
+        Err(_) => { return "<unserializable>"; }
+    }
 }
 
 let _snapshot_dir: string = "__snapshots__";

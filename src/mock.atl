@@ -62,13 +62,7 @@ impl Spy {
     }
 
     fn returns(borrow self): any[] {
-        let mut out: any[] = [];
-        let mut i = 0;
-        while i < self.calls.length() {
-            out = out.push(self.calls[i].returned);
-            i = i + 1;
-        }
-        return out;
+        return self.calls.map(fn(c: Call): any { return c.returned; });
     }
 
     fn reset(borrow self): Spy {
@@ -105,13 +99,7 @@ impl Spy1 {
     }
 
     fn args(borrow self): any[] {
-        let mut out: any[] = [];
-        let mut i = 0;
-        while i < self.calls.length() {
-            out = out.push(self.calls[i].arg);
-            i = i + 1;
-        }
-        return out;
+        return self.calls.map(fn(c: Call1): any { return c.arg; });
     }
 
     fn nth_call(borrow self, n: number): Call1 {
@@ -120,14 +108,7 @@ impl Spy1 {
     }
 
     fn called_with(borrow self, arg: any): bool {
-        let mut i = 0;
-        while i < self.calls.length() {
-            if self.calls[i].arg == arg {
-                return true;
-            }
-            i = i + 1;
-        }
-        return false;
+        return self.calls.filter(fn(c: Call1): bool { return c.arg == arg; }).length() > 0;
     }
 
     fn reset(borrow self): Spy1 {
