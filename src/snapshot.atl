@@ -4,18 +4,14 @@
 //
 //   import { snapshot } from 'argus';
 //
-//   snapshot.match("user object", user);      // writes on first run, asserts after
+//   snapshot.assert_match("user object", user);  // writes on first run, asserts after
 //   snapshot.update("api response", new_body); // force-overwrite stored snapshot
 //
 // Snapshots are stored as plain text at:
 //   __snapshots__/<name>.snap
 
 fn _serialize(value: any): string {
-    let result = Json.stringify(value);
-    match result {
-        Ok(s) => return s,
-        Err(_) => return value.string(),
-    }
+    return Json.stringify(value);
 }
 
 let _snapshot_dir: string = "__snapshots__";
@@ -25,7 +21,7 @@ let _snapshot_dir: string = "__snapshots__";
 export struct SnapshotNamespace {}
 
 impl SnapshotNamespace {
-    fn match(borrow self, name: string, value: any): void {
+    fn assert_match(borrow self, name: string, value: any): void {
         let serialized = _serialize(value);
         let path = _snapshot_dir + "/" + name + ".snap";
 

@@ -5,12 +5,12 @@
 //   import { mock } from 'argus';
 //
 //   let s = mock.spy(fn(): number { return 42; });
-//   s.fn();
+//   s.call_fn();
 //   mock.verify(s).calledOnce();
 //   mock.verify(s).calledTimes(1);
 //
 //   let s1 = mock.spy1(fn(x: number): number { return x * 2; });
-//   s1.fn(5);
+//   s1.call_fn(5);
 //   mock.verifyAs(s1, "doubler").calledOnce();
 //
 //   let always = mock.stub(42);
@@ -33,7 +33,7 @@ export struct Call1 {
 // ── Spy (0-arg) ────────────────────────────────────────────────────────────
 
 export struct Spy {
-    fn: fn(): any,
+    call_fn: (): any,
     calls: Call[],
 }
 
@@ -57,7 +57,7 @@ impl Spy {
     }
 
     fn nth_return(borrow self, n: number): any {
-        test.assert(n >= 0 && n < self.calls.length(), "spy call index out of range: " + n.string());
+        test.assert(n >= 0 && n < self.calls.length(), "spy call index out of range: " + n.toString());
         return self.calls[n].returned;
     }
 
@@ -72,14 +72,14 @@ impl Spy {
     }
 
     fn reset(borrow self): Spy {
-        return Spy { fn: self.fn, calls: [] };
+        return Spy { call_fn: self.call_fn, calls: [] };
     }
 }
 
 // ── Spy1 (1-arg) ──────────────────────────────────────────────────────────
 
 export struct Spy1 {
-    fn: fn(arg: any): any,
+    call_fn: (arg: any): any,
     calls: Call1[],
 }
 
@@ -115,7 +115,7 @@ impl Spy1 {
     }
 
     fn nth_call(borrow self, n: number): Call1 {
-        test.assert(n >= 0 && n < self.calls.length(), "spy1 call index out of range: " + n.string());
+        test.assert(n >= 0 && n < self.calls.length(), "spy1 call index out of range: " + n.toString());
         return self.calls[n];
     }
 
@@ -131,14 +131,14 @@ impl Spy1 {
     }
 
     fn reset(borrow self): Spy1 {
-        return Spy1 { fn: self.fn, calls: [] };
+        return Spy1 { call_fn: self.call_fn, calls: [] };
     }
 }
 
 // ── Stub ───────────────────────────────────────────────────────────────────
 
 export struct Stub {
-    fn: fn(): any,
+    call_fn: (): any,
     call_count: number,
 }
 
@@ -164,7 +164,7 @@ impl Verify {
         let count = self.subject.call_count();
         test.assert(
             count == n,
-            self.label + ": expected " + n.string() + " calls, got " + count.string(),
+            self.label + ": expected " + n.toString() + " calls, got " + count.toString(),
         );
         return self;
     }
@@ -173,7 +173,7 @@ impl Verify {
         let count = self.subject.call_count();
         test.assert(
             count >= n,
-            self.label + ": expected at least " + n.string() + " calls, got " + count.string(),
+            self.label + ": expected at least " + n.toString() + " calls, got " + count.toString(),
         );
         return self;
     }
@@ -182,7 +182,7 @@ impl Verify {
         let count = self.subject.call_count();
         test.assert(
             count <= n,
-            self.label + ": expected at most " + n.string() + " calls, got " + count.string(),
+            self.label + ": expected at most " + n.toString() + " calls, got " + count.toString(),
         );
         return self;
     }
@@ -191,7 +191,7 @@ impl Verify {
         let count = self.subject.call_count();
         test.assert(
             count == 0,
-            self.label + ": expected 0 calls, got " + count.string(),
+            self.label + ": expected 0 calls, got " + count.toString(),
         );
         return self;
     }
@@ -207,7 +207,7 @@ impl Verify {
 export struct MockNamespace {}
 
 impl MockNamespace {
-    fn spy(borrow self, target: fn(): any): Spy {
+    fn spy(borrow self, target: (): any): Spy {
         let mut calls: Call[] = [];
         let mut idx = 0;
         let wrapper = fn(): any {
@@ -216,10 +216,10 @@ impl MockNamespace {
             idx = idx + 1;
             return result;
         };
-        return Spy { fn: wrapper, calls: calls };
+        return Spy { call_fn: wrapper, calls: calls };
     }
 
-    fn spy1(borrow self, target: fn(arg: any): any): Spy1 {
+    fn spy1(borrow self, target: (arg: any): any): Spy1 {
         let mut calls: Call1[] = [];
         let mut idx = 0;
         let wrapper = fn(arg: any): any {
@@ -228,7 +228,7 @@ impl MockNamespace {
             idx = idx + 1;
             return result;
         };
-        return Spy1 { fn: wrapper, calls: calls };
+        return Spy1 { call_fn: wrapper, calls: calls };
     }
 
     fn stub(borrow self, value: any): Stub {
@@ -237,7 +237,7 @@ impl MockNamespace {
             count = count + 1;
             return value;
         };
-        return Stub { fn: f, call_count: count };
+        return Stub { call_fn: f, call_count: count };
     }
 
     fn stubSeq(borrow self, values: any[]): Stub {
@@ -253,16 +253,16 @@ impl MockNamespace {
             count = count + 1;
             return v;
         };
-        return Stub { fn: f, call_count: count };
+        return Stub { call_fn: f, call_count: count };
     }
 
-    fn stubFn(borrow self, impl_fn: fn(): any): Stub {
+    fn stubFn(borrow self, impl_fn: (): any): Stub {
         let mut count = 0;
         let f = fn(): any {
             count = count + 1;
             return impl_fn();
         };
-        return Stub { fn: f, call_count: count };
+        return Stub { call_fn: f, call_count: count };
     }
 
     fn verify(borrow self, subject: any): Verify {

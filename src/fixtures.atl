@@ -29,8 +29,8 @@
 //   afterEach(fn(): void  { conn.teardown(); });
 
 export struct Fixture {
-    build: fn(): any,
-    teardown_fn: fn(v: any): void,
+    build: (): any,
+    teardown_fn: (v: any): void,
     _current: any,
     _ready: bool,
 }
@@ -65,7 +65,7 @@ impl Fixture {
 fn _no_teardown(v: any): void {}
 
 // fixture — builds a fresh value before each test. No teardown.
-export fn fixture(factory: fn(): any): Fixture {
+export fn fixture(factory: (): any): Fixture {
     return Fixture {
         build: factory,
         teardown_fn: _no_teardown,
@@ -75,7 +75,7 @@ export fn fixture(factory: fn(): any): Fixture {
 }
 
 // fixtureWithTeardown — like fixture, but calls teardown_fn(value) in afterEach.
-export fn fixtureWithTeardown(factory: fn(): any, teardown: fn(v: any): void): Fixture {
+export fn fixtureWithTeardown(factory: (): any, teardown: (v: any): void): Fixture {
     return Fixture {
         build: factory,
         teardown_fn: teardown,

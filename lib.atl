@@ -5,7 +5,7 @@
 //   import { describe, it, beforeEach, run } from 'argus';   // suite structure (bare)
 //   import { expect } from 'argus';                           // fluent assertions (bare)
 //   import { mock } from 'argus';                             // mock.spy(), mock.stub(), mock.verify()
-//   import { snapshot } from 'argus';                         // snapshot.match(), snapshot.update()
+//   import { snapshot } from 'argus';                         // snapshot.assert_match(), snapshot.update()
 //   import { report } from 'argus';                           // report.pretty(), report.dot(), etc.
 //   import { fixture } from 'argus';                          // fixture factory (bare)
 //

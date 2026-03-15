@@ -69,7 +69,7 @@ impl ReportNamespace {
         let mut i = 0;
         while i < results.length() {
             let r = results[i];
-            console.log("\n  " + r.name + "  (" + r.duration_ms.string() + "ms)");
+            console.log("\n  " + r.name + "  (" + r.duration_ms.toString() + "ms)");
             let mut j = 0;
             while j < r.failures.length() {
                 let f = r.failures[j];
@@ -83,10 +83,10 @@ impl ReportNamespace {
         let s = _summarize(results);
         console.log("\n  ──────────────────────────────────────────");
         console.log(
-            "  passed: " + s.passed.string() +
-            "  failed: " + s.failed.string() +
-            "  skipped: " + s.skipped.string() +
-            "  (" + s.duration_ms.string() + "ms)"
+            "  passed: " + s.passed.toString() +
+            "  failed: " + s.failed.toString() +
+            "  skipped: " + s.skipped.toString() +
+            "  (" + s.duration_ms.toString() + "ms)"
         );
         if s.all_passed {
             console.log("  PASS");
@@ -115,7 +115,7 @@ impl ReportNamespace {
             i = i + 1;
         }
         let s = _summarize(results);
-        console.log("\n  passed: " + s.passed.string() + "  failed: " + s.failed.string());
+        console.log("\n  passed: " + s.passed.toString() + "  failed: " + s.failed.toString());
     }
 
     // dot — one character per test: . pass  F fail  S skip
@@ -139,9 +139,9 @@ impl ReportNamespace {
 
         let sum = _summarize(results);
         if sum.all_passed {
-            console.log("ok (" + sum.passed.string() + " passed, " + sum.duration_ms.string() + "ms)");
+            console.log("ok (" + sum.passed.toString() + " passed, " + sum.duration_ms.toString() + "ms)");
         } else {
-            console.log("FAIL (" + sum.failed.string() + " failures)");
+            console.log("FAIL (" + sum.failed.toString() + " failures)");
         }
     }
 
@@ -159,7 +159,7 @@ impl ReportNamespace {
         let total = sum.passed + sum.failed + sum.skipped;
 
         console.log("TAP version 13");
-        console.log("1.." + total.string());
+        console.log("1.." + total.toString());
 
         let mut test_num = 1;
         let mut i = 0;
@@ -168,7 +168,7 @@ impl ReportNamespace {
 
             let mut p = 0;
             while p < r.passed {
-                console.log("ok " + test_num.string() + " - " + r.name + " (passed)");
+                console.log("ok " + test_num.toString() + " - " + r.name + " (passed)");
                 test_num = test_num + 1;
                 p = p + 1;
             }
@@ -176,7 +176,7 @@ impl ReportNamespace {
             let mut j = 0;
             while j < r.failures.length() {
                 let f = r.failures[j];
-                console.log("not ok " + test_num.string() + " - " + r.name + " › " + f.case_name);
+                console.log("not ok " + test_num.toString() + " - " + r.name + " › " + f.case_name);
                 console.log("  ---");
                 console.log("  message: " + f.message);
                 console.log("  suite: " + f.suite);
@@ -187,7 +187,7 @@ impl ReportNamespace {
 
             let mut s = 0;
             while s < r.skipped {
-                console.log("ok " + test_num.string() + " - " + r.name + " # SKIP");
+                console.log("ok " + test_num.toString() + " - " + r.name + " # SKIP");
                 test_num = test_num + 1;
                 s = s + 1;
             }
@@ -206,7 +206,7 @@ impl ReportNamespace {
         let encoded = Json.stringify(payload);
         match encoded {
             Ok(s) => console.log(s),
-            Err(e) => console.log('{"error":"' + e + '"}'),
+            Err(e) => console.log("{\"error\":\"" + e + "\"}"),
         }
     }
 }

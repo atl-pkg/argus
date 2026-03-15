@@ -26,8 +26,8 @@ impl Expect {
         return Expect { value: self.value, label: self.label, negated: !self.negated };
     }
 
-    // Attach a label shown in failure messages: expect(x).as("user count").toEqual(3)
-    fn as(borrow self, label: string): Expect {
+    // Attach a label shown in failure messages: expect(x).withLabel("user count").toEqual(3)
+    fn withLabel(borrow self, label: string): Expect {
         return Expect { value: self.value, label: label, negated: self.negated };
     }
 
@@ -35,14 +35,14 @@ impl Expect {
 
     fn toEqual(borrow self, expected: any): Expect {
         let pass = self.value == expected;
-        _check(self, pass, "toEqual", expected.string());
+        _check(self, pass, "toEqual", expected.toString());
         return Expect { value: self.value, label: self.label, negated: false };
     }
 
     fn toBe(borrow self, expected: any): Expect {
         // Reference/value identity — same as toEqual for Atlas value semantics.
         let pass = self.value == expected;
-        _check(self, pass, "toBe", expected.string());
+        _check(self, pass, "toBe", expected.toString());
         return Expect { value: self.value, label: self.label, negated: false };
     }
 
@@ -64,25 +64,25 @@ impl Expect {
 
     fn toBeGreaterThan(borrow self, n: number): Expect {
         let pass = self.value > n;
-        _check(self, pass, "toBeGreaterThan", n.string());
+        _check(self, pass, "toBeGreaterThan", n.toString());
         return Expect { value: self.value, label: self.label, negated: false };
     }
 
     fn toBeGreaterThanOrEqual(borrow self, n: number): Expect {
         let pass = self.value >= n;
-        _check(self, pass, "toBeGreaterThanOrEqual", n.string());
+        _check(self, pass, "toBeGreaterThanOrEqual", n.toString());
         return Expect { value: self.value, label: self.label, negated: false };
     }
 
     fn toBeLessThan(borrow self, n: number): Expect {
-        let pass = self.value < n;
-        _check(self, pass, "toBeLessThan", n.string());
+        let pass = n > self.value;
+        _check(self, pass, "toBeLessThan", n.toString());
         return Expect { value: self.value, label: self.label, negated: false };
     }
 
     fn toBeLessThanOrEqual(borrow self, n: number): Expect {
         let pass = self.value <= n;
-        _check(self, pass, "toBeLessThanOrEqual", n.string());
+        _check(self, pass, "toBeLessThanOrEqual", n.toString());
         return Expect { value: self.value, label: self.label, negated: false };
     }
 
@@ -90,7 +90,7 @@ impl Expect {
         let diff = self.value - expected;
         let abs_diff = if diff < 0 { diff * -1 } else { diff };
         let pass = abs_diff <= epsilon;
-        _check(self, pass, "toApprox(ε=" + epsilon.string() + ")", expected.string());
+        _check(self, pass, "toApprox(ε=" + epsilon.toString() + ")", expected.toString());
         return Expect { value: self.value, label: self.label, negated: false };
     }
 
@@ -125,7 +125,7 @@ impl Expect {
     fn toHaveLength(borrow self, n: number): Expect {
         let actual_len = self.value.length();
         let pass = actual_len == n;
-        _check(self, pass, "toHaveLength", n.string());
+        _check(self, pass, "toHaveLength", n.toString());
         return Expect { value: self.value, label: self.label, negated: false };
     }
 
@@ -189,9 +189,9 @@ export fn expect(value: any): Expect {
 
 fn _label(e: Expect): string {
     if e.label == "" {
-        return "expect(" + e.value.string() + ")";
+        return "expect(" + e.value.toString() + ")";
     }
-    return "expect[" + e.label + "](" + e.value.string() + ")";
+    return "expect[" + e.label + "](" + e.value.toString() + ")";
 }
 
 fn _check(e: Expect, raw_pass: bool, matcher: string, expected_repr: string): void {

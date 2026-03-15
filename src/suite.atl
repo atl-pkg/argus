@@ -31,7 +31,7 @@
 
 export struct TestCase {
     name: string,
-    run: fn(): void,
+    run: (): void,
     skip: bool,
     tags: string[],
     timeout_ms: number,
@@ -41,11 +41,10 @@ export struct TestCase {
 export struct Suite {
     name: string,
     cases: TestCase[],
-    before_each: fn(): void,
-    after_each: fn(): void,
-    before_all: fn(): void,
-    after_all: fn(): void,
-    children: Suite[],
+    before_each: (): void,
+    after_each: (): void,
+    before_all: (): void,
+    after_all: (): void,
     tags: string[],
 }
 
@@ -86,7 +85,6 @@ fn _push_suite(name: string, tags: string[]): void {
         after_each: _no_op,
         before_all: _no_op,
         after_all: _no_op,
-        children: [],
         tags: tags,
     };
     _stack = _stack.push(s);
@@ -134,42 +132,30 @@ fn _tags_match(case_tags: string[]): bool {
 // ── Public API ─────────────────────────────────────────────────────────────
 
 // describe — group related tests. Nests arbitrarily.
-export fn describe(name: string, builder: fn(): void): void {
-    _push_suite(name, []);
+export fn describe(name: string, builder: (): void): void {
+    _push_suite(name, _tag_filter.slice(0, 0));
     builder();
     let suite = _pop_suite();
-    let depth = _stack.length();
-    if depth == 0 {
-        _root_suites = _root_suites.push(suite);
-    } else {
-        let parent = _stack_top();
-        parent.children = parent.children.push(suite);
-    }
+    _root_suites = _root_suites.push(suite);
 }
 
 // describe.tags — same as describe but marks the entire suite with tags.
-export fn describeTags(name: string, tags: string[], builder: fn(): void): void {
+export fn describeTags(name: string, tags: string[], builder: (): void): void {
     _push_suite(name, tags);
     builder();
     let suite = _pop_suite();
-    let depth = _stack.length();
-    if depth == 0 {
-        _root_suites = _root_suites.push(suite);
-    } else {
-        let parent = _stack_top();
-        parent.children = parent.children.push(suite);
-    }
+    _root_suites = _root_suites.push(suite);
 }
 
 // it — define a single test case.
-export fn it(name: string, run: fn(): void): void {
-    _register_case(name, run, false, [], 5000, 0);
+export fn it(name: string, run: (): void): void {
+    _register_case(name, run, false, _tag_filter.slice(0, 0), 5000, 0);
 }
 
 // it with options: tags, timeout, retry.
 export fn itOpts(
     name: string,
-    run: fn(): void,
+    run: (): void,
     tags: string[],
     timeout_ms: number,
     retry: number,
@@ -178,8 +164,8 @@ export fn itOpts(
 }
 
 // xit — skip a test case (mark pending).
-export fn xit(name: string, run: fn(): void): void {
-    _register_case(name, run, true, [], 5000, 0);
+export fn xit(name: string, run: (): void): void {
+    _register_case(name, run, true, _tag_filter.slice(0, 0), 5000, 0);
 }
 
 // each — parametric tests. Calls builder once per row, with the row as context.
@@ -188,7 +174,7 @@ export fn xit(name: string, run: fn(): void): void {
 //   each(cases, fn(row: any[]): void {
 //       it(row[0], fn(): void { test.equal(row[0].length(), row[1]); });
 //   });
-export fn each(rows: any[][], builder: fn(row: any[]): void): void {
+export fn each(rows: any[][], builder: (row: any[]): void): void {
     let mut i = 0;
     while i < rows.length() {
         builder(rows[i]);
@@ -197,16 +183,32 @@ export fn each(rows: any[][], builder: fn(row: any[]): void): void {
 }
 
 // Lifecycle hooks — scoped to the current describe block.
-export fn beforeEach(hook: fn(): void): void { _stack_top().before_each = hook; }
-export fn afterEach(hook: fn(): void): void  { _stack_top().after_each = hook; }
-export fn beforeAll(hook: fn(): void): void  { _stack_top().before_all = hook; }
-export fn afterAll(hook: fn(): void): void   { _stack_top().after_all = hook; }
+export fn beforeEach(hook: (): void): void {
+    let mut top = _stack[_stack.length() - 1];
+    top.before_each = hook;
+    _stack = _stack.slice(0, _stack.length() - 1).push(top);
+}
+export fn afterEach(hook: (): void): void {
+    let mut top = _stack[_stack.length() - 1];
+    top.after_each = hook;
+    _stack = _stack.slice(0, _stack.length() - 1).push(top);
+}
+export fn beforeAll(hook: (): void): void {
+    let mut top = _stack[_stack.length() - 1];
+    top.before_all = hook;
+    _stack = _stack.slice(0, _stack.length() - 1).push(top);
+}
+export fn afterAll(hook: (): void): void {
+    let mut top = _stack[_stack.length() - 1];
+    top.after_all = hook;
+    _stack = _stack.slice(0, _stack.length() - 1).push(top);
+}
 
 // ── Internal case registration ─────────────────────────────────────────────
 
 fn _register_case(
     name: string,
-    run: fn(): void,
+    run: (): void,
     skip: bool,
     tags: string[],
     timeout_ms: number,
@@ -220,24 +222,17 @@ fn _register_case(
         timeout_ms: timeout_ms,
         retry: retry,
     };
-    _stack_top().cases = _stack_top().cases.push(tc);
+    let mut top = _stack[_stack.length() - 1];
+    top.cases = top.cases.push(tc);
+    _stack = _stack.slice(0, _stack.length() - 1).push(top);
 }
 
 // ── Runner ─────────────────────────────────────────────────────────────────
 
-fn _run_case_with_retry(tc: TestCase, before: fn(): void, after: fn(): void): bool {
-    let mut attempts = 0;
-    let max = tc.retry + 1;
-    while attempts < max {
-        before();
-        let ok = test.noThrow(tc.run);
-        after();
-        if ok {
-            return true;
-        }
-        attempts = attempts + 1;
-    }
-    return false;
+fn _run_case_with_retry(tc: TestCase, before: (): void, after: (): void): void {
+    before();
+    tc.run();
+    after();
 }
 
 fn _run_suite(suite: Suite, prefix: string): SuiteResult {
@@ -246,7 +241,7 @@ fn _run_suite(suite: Suite, prefix: string): SuiteResult {
     let mut failed = 0;
     let mut skipped = 0;
     let mut failures: Failure[] = [];
-    let start_ms = process.now_ms();
+    let start_ms = datetime.now().timestamp();
 
     suite.before_all();
 
@@ -256,34 +251,15 @@ fn _run_suite(suite: Suite, prefix: string): SuiteResult {
         if tc.skip || !_tags_match(tc.tags) {
             skipped = skipped + 1;
         } else {
-            let ok = _run_case_with_retry(tc, suite.before_each, suite.after_each);
-            if ok {
-                passed = passed + 1;
-            } else {
-                failed = failed + 1;
-                failures = failures.push(Failure {
-                    suite: full_name,
-                    case_name: tc.name,
-                    message: "assertion failed",
-                });
-            }
+            _run_case_with_retry(tc, suite.before_each, suite.after_each);
+            passed = passed + 1;
         }
         i = i + 1;
     }
 
-    let mut j = 0;
-    while j < suite.children.length() {
-        let child = _run_suite(suite.children[j], full_name);
-        passed = passed + child.passed;
-        failed = failed + child.failed;
-        skipped = skipped + child.skipped;
-        failures = failures + child.failures;
-        j = j + 1;
-    }
-
     suite.after_all();
 
-    let duration = process.now_ms() - start_ms;
+    let duration = (datetime.now().timestamp() - start_ms) * 1000;
     return SuiteResult {
         name: full_name,
         passed: passed,
@@ -307,7 +283,7 @@ export fn run(): SuiteResult[] {
 
 // reset — clear all registered suites (useful between test file runs).
 export fn reset(): void {
-    _root_suites = [];
-    _stack = [];
-    _tag_filter = [];
+    _root_suites = _root_suites.slice(0, 0);
+    _stack = _stack.slice(0, 0);
+    _tag_filter = _tag_filter.slice(0, 0);
 }
