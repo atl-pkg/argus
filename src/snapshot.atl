@@ -1,23 +1,16 @@
 // snapshot — snapshot assertion helpers
 //
-// Snapshots serialize a value to a canonical string and compare it against a
-// stored reference. On first run (no stored snapshot) the value is written.
-// On subsequent runs the serialized value must match exactly.
+// Accessed via the `snapshot` namespace singleton:
 //
-// Snapshot files are stored as plain text at:
-//   __snapshots__/<test-file-name>/<snapshot-name>.snap
+//   import { snapshot } from 'argus';
 //
-// Usage:
-//   import { matchSnapshot, updateSnapshot } from 'argus';
+//   snapshot.match("user object", user);      // writes on first run, asserts after
+//   snapshot.update("api response", new_body); // force-overwrite stored snapshot
 //
-//   matchSnapshot("user object", user);
-//   matchSnapshot("api response", response_body);
-
-// ── Serialization ──────────────────────────────────────────────────────────
+// Snapshots are stored as plain text at:
+//   __snapshots__/<name>.snap
 
 fn _serialize(value: any): string {
-    // Delegates to Json.stringify for structured types, falls back to string().
-    // Numbers, bools, strings, arrays, and structs all round-trip through JSON.
     let result = Json.stringify(value);
     match result {
         Ok(s) => return s,
@@ -25,48 +18,51 @@ fn _serialize(value: any): string {
     }
 }
 
-// ── Snapshot store ─────────────────────────────────────────────────────────
-
 let _snapshot_dir: string = "__snapshots__";
 
-export fn matchSnapshot(name: string, value: any): void {
-    let serialized = _serialize(value);
-    let path = _snapshot_dir + "/" + name + ".snap";
+// ── SnapshotNamespace ──────────────────────────────────────────────────────
 
-    let existing = file.read(path);
-    match existing {
-        Ok(stored) => {
-            test.equal(
-                serialized,
-                stored,
-                "snapshot mismatch for: " + name,
-            );
-        },
-        Err(_) => {
-            // First run — write the snapshot.
-            let write_result = file.write(path, serialized);
-            match write_result {
-                Ok(_) => {
-                    console.log("[argus] snapshot written: " + name);
-                },
-                Err(e) => {
-                    test.assert(false, "failed to write snapshot: " + e);
-                },
-            }
-        },
+export struct SnapshotNamespace {}
+
+impl SnapshotNamespace {
+    fn match(borrow self, name: string, value: any): void {
+        let serialized = _serialize(value);
+        let path = _snapshot_dir + "/" + name + ".snap";
+
+        let existing = file.read(path);
+        match existing {
+            Ok(stored) => {
+                test.equal(serialized, stored, "snapshot mismatch for: " + name);
+            },
+            Err(_) => {
+                let write_result = file.write(path, serialized);
+                match write_result {
+                    Ok(_) => {
+                        console.log("[argus] snapshot written: " + name);
+                    },
+                    Err(e) => {
+                        test.assert(false, "failed to write snapshot: " + e);
+                    },
+                }
+            },
+        }
+    }
+
+    fn update(borrow self, name: string, value: any): void {
+        let serialized = _serialize(value);
+        let path = _snapshot_dir + "/" + name + ".snap";
+        let write_result = file.write(path, serialized);
+        match write_result {
+            Ok(_) => {
+                console.log("[argus] snapshot updated: " + name);
+            },
+            Err(e) => {
+                test.assert(false, "failed to update snapshot: " + e);
+            },
+        }
     }
 }
 
-export fn updateSnapshot(name: string, value: any): void {
-    let serialized = _serialize(value);
-    let path = _snapshot_dir + "/" + name + ".snap";
-    let write_result = file.write(path, serialized);
-    match write_result {
-        Ok(_) => {
-            console.log("[argus] snapshot updated: " + name);
-        },
-        Err(e) => {
-            test.assert(false, "failed to update snapshot: " + e);
-        },
-    }
-}
+// ── Singleton ──────────────────────────────────────────────────────────────
+
+export let snapshot: SnapshotNamespace = SnapshotNamespace {};

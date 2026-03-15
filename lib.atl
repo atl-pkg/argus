@@ -1,24 +1,17 @@
 // argus — Official test framework for Atlas
 //
-// Structured test suites, lifecycle hooks, parametric tests, mocking, spies,
-// fixtures, snapshots, and pluggable reporters — built on Atlas's built-in
-// test.* primitives.
+// Import surface:
 //
-// Two-tier architecture:
-//   test.*  (built-in) — raw assertions, always available, zero deps
-//   argus   (this)    — structure, mocking, fixtures, reporters
+//   import { describe, it, beforeEach, run } from 'argus';   // suite structure (bare)
+//   import { expect } from 'argus';                           // fluent assertions (bare)
+//   import { mock } from 'argus';                             // mock.spy(), mock.stub(), mock.verify()
+//   import { snapshot } from 'argus';                         // snapshot.match(), snapshot.update()
+//   import { report } from 'argus';                           // report.pretty(), report.dot(), etc.
+//   import { fixture } from 'argus';                          // fixture factory (bare)
 //
 // https://github.com/atl-pkg/argus
-//
-// Quick start:
-//   import { describe, it, beforeEach, run } from 'argus';
-//   import { expect } from 'argus';
-//   import { spy, stub, verify } from 'argus';
-//   import { fixture } from 'argus';
-//   import { matchSnapshot } from 'argus';
-//   import { pretty } from 'argus';
 
-// Suite
+// Suite — bare imports (test structure reads best without a prefix)
 export {
     describe, describeTags,
     it, itOpts, xit, each,
@@ -27,33 +20,34 @@ export {
     Suite, TestCase, SuiteResult, Failure,
 } from "./src/suite";
 
-// Expect
+// Expect — bare import (universal convention, mirrors Jest/Vitest)
 export {
     expect,
     Expect,
 } from "./src/expect";
 
-// Mock
+// Mock — namespace singleton + types for annotations
 export {
-    spy, spy1,
-    stub, stub_seq, stub_fn,
-    verify, verifyAs,
-    Spy, Spy1, Stub, Call, Call1, Verify,
+    mock,
+    MockNamespace,
+    Spy, Spy1, Stub, Verify, Call, Call1,
 } from "./src/mock";
 
-// Fixtures
+// Snapshot — namespace singleton
+export {
+    snapshot,
+    SnapshotNamespace,
+} from "./src/snapshot";
+
+// Report — namespace singleton + summary type
+export {
+    report,
+    ReportNamespace,
+    RunSummary,
+} from "./src/reporters";
+
+// Fixtures — bare imports (already scoped by name)
 export {
     fixture, fixtureWithTeardown,
     Fixture,
 } from "./src/fixtures";
-
-// Snapshot
-export {
-    matchSnapshot, updateSnapshot,
-} from "./src/snapshot";
-
-// Reporters
-export {
-    pretty, verbose, dot, tap, json_report,
-    summarize, RunSummary,
-} from "./src/reporters";

@@ -1,34 +1,23 @@
 // mock — spies, stubs, and call verification
 //
-// Spies wrap a function and record every call. Stubs replace functions with
-// controlled implementations. All mocks track call counts and return values.
+// Accessed via the `mock` namespace singleton:
 //
-// Usage:
-//   import { spy, spy1, stub, stub_seq, stub_fn, verify } from 'argus';
+//   import { mock } from 'argus';
 //
-//   // Zero-arg spy
-//   let s = spy(fn(): number { return computeAnswer(); });
+//   let s = mock.spy(fn(): number { return 42; });
 //   s.fn();
-//   expect(s.call_count()).toEqual(1);
-//   expect(s.last_return()).toEqual(42);
+//   mock.verify(s).calledOnce();
+//   mock.verify(s).calledTimes(1);
 //
-//   // One-arg spy (captures input too)
-//   let s1 = spy1(fn(x: number): number { return x * 2; });
+//   let s1 = mock.spy1(fn(x: number): number { return x * 2; });
 //   s1.fn(5);
-//   expect(s1.last_arg()).toEqual(5);
-//   expect(s1.last_return()).toEqual(10);
+//   mock.verifyAs(s1, "doubler").calledOnce();
 //
-//   // Stubs
-//   let m = stub(42);          // always returns 42
-//   let seq = stub_seq([1,2,3]); // returns 1, 2, 3, 3, 3...
-//   let custom = stub_fn(fn(): string { return "dynamic"; });
-//
-//   // Verify expectations
-//   verify(s).calledTimes(3);
-//   verify(s).calledAtLeast(1);
-//   verify(s).neverCalled();
+//   let always = mock.stub(42);
+//   let seq    = mock.stubSeq([1, 2, 3]);
+//   let custom = mock.stubFn(fn(): string { return build(); });
 
-// ── Call record ────────────────────────────────────────────────────────────
+// ── Call records ───────────────────────────────────────────────────────────
 
 export struct Call {
     index: number,
@@ -41,7 +30,7 @@ export struct Call1 {
     returned: any,
 }
 
-// ── Spy (0-arg) ───────────────────────────────────────────────────────────
+// ── Spy (0-arg) ────────────────────────────────────────────────────────────
 
 export struct Spy {
     fn: fn(): any,
@@ -85,18 +74,6 @@ impl Spy {
     fn reset(borrow self): Spy {
         return Spy { fn: self.fn, calls: [] };
     }
-}
-
-export fn spy(target: fn(): any): Spy {
-    let mut calls: Call[] = [];
-    let mut idx = 0;
-    let wrapper = fn(): any {
-        let result = target();
-        calls = calls.push(Call { index: idx, returned: result });
-        idx = idx + 1;
-        return result;
-    };
-    return Spy { fn: wrapper, calls: calls };
 }
 
 // ── Spy1 (1-arg) ──────────────────────────────────────────────────────────
@@ -158,19 +135,7 @@ impl Spy1 {
     }
 }
 
-export fn spy1(target: fn(arg: any): any): Spy1 {
-    let mut calls: Call1[] = [];
-    let mut idx = 0;
-    let wrapper = fn(arg: any): any {
-        let result = target(arg);
-        calls = calls.push(Call1 { index: idx, arg: arg, returned: result });
-        idx = idx + 1;
-        return result;
-    };
-    return Spy1 { fn: wrapper, calls: calls };
-}
-
-// ── Stub ──────────────────────────────────────────────────────────────────
+// ── Stub ───────────────────────────────────────────────────────────────────
 
 export struct Stub {
     fn: fn(): any,
@@ -187,46 +152,7 @@ impl Stub {
     }
 }
 
-// stub — always returns the given value.
-export fn stub(value: any): Stub {
-    let mut count = 0;
-    let f = fn(): any {
-        count = count + 1;
-        return value;
-    };
-    return Stub { fn: f, call_count: count };
-}
-
-// stub_seq — returns values in order, then repeats the last.
-export fn stub_seq(values: any[]): Stub {
-    test.assert(values.length() > 0, "stub_seq: requires at least one value");
-    let mut idx = 0;
-    let mut count = 0;
-    let last = values.length() - 1;
-    let f = fn(): any {
-        let v = values[idx];
-        if idx < last {
-            idx = idx + 1;
-        }
-        count = count + 1;
-        return v;
-    };
-    return Stub { fn: f, call_count: count };
-}
-
-// stub_fn — custom implementation, call-counted.
-export fn stub_fn(impl_fn: fn(): any): Stub {
-    let mut count = 0;
-    let f = fn(): any {
-        count = count + 1;
-        return impl_fn();
-    };
-    return Stub { fn: f, call_count: count };
-}
-
-// ── Verify ────────────────────────────────────────────────────────────────
-// Fluent call-count assertions on any spy/stub.
-// Accepts Spy, Spy1, or Stub via any (duck-typed).
+// ── Verify ─────────────────────────────────────────────────────────────────
 
 export struct Verify {
     subject: any,
@@ -275,10 +201,79 @@ impl Verify {
     }
 }
 
-export fn verify(subject: any): Verify {
-    return Verify { subject: subject, label: "mock" };
+// ── MockNamespace ──────────────────────────────────────────────────────────
+// Zero-field singleton — all factory methods live here.
+
+export struct MockNamespace {}
+
+impl MockNamespace {
+    fn spy(borrow self, target: fn(): any): Spy {
+        let mut calls: Call[] = [];
+        let mut idx = 0;
+        let wrapper = fn(): any {
+            let result = target();
+            calls = calls.push(Call { index: idx, returned: result });
+            idx = idx + 1;
+            return result;
+        };
+        return Spy { fn: wrapper, calls: calls };
+    }
+
+    fn spy1(borrow self, target: fn(arg: any): any): Spy1 {
+        let mut calls: Call1[] = [];
+        let mut idx = 0;
+        let wrapper = fn(arg: any): any {
+            let result = target(arg);
+            calls = calls.push(Call1 { index: idx, arg: arg, returned: result });
+            idx = idx + 1;
+            return result;
+        };
+        return Spy1 { fn: wrapper, calls: calls };
+    }
+
+    fn stub(borrow self, value: any): Stub {
+        let mut count = 0;
+        let f = fn(): any {
+            count = count + 1;
+            return value;
+        };
+        return Stub { fn: f, call_count: count };
+    }
+
+    fn stubSeq(borrow self, values: any[]): Stub {
+        test.assert(values.length() > 0, "mock.stubSeq: requires at least one value");
+        let mut idx = 0;
+        let mut count = 0;
+        let last = values.length() - 1;
+        let f = fn(): any {
+            let v = values[idx];
+            if idx < last {
+                idx = idx + 1;
+            }
+            count = count + 1;
+            return v;
+        };
+        return Stub { fn: f, call_count: count };
+    }
+
+    fn stubFn(borrow self, impl_fn: fn(): any): Stub {
+        let mut count = 0;
+        let f = fn(): any {
+            count = count + 1;
+            return impl_fn();
+        };
+        return Stub { fn: f, call_count: count };
+    }
+
+    fn verify(borrow self, subject: any): Verify {
+        return Verify { subject: subject, label: "mock" };
+    }
+
+    fn verifyAs(borrow self, subject: any, label: string): Verify {
+        return Verify { subject: subject, label: label };
+    }
 }
 
-export fn verifyAs(subject: any, label: string): Verify {
-    return Verify { subject: subject, label: label };
-}
+// ── Singleton ──────────────────────────────────────────────────────────────
+
+export let mock: MockNamespace = MockNamespace {};
