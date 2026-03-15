@@ -1,0 +1,198 @@
+// suite — describe/it blocks with lifecycle hooks
+//
+// Builds a structured test suite on top of Atlas's built-in test.* assertions.
+// Suites are collected and run by the Argus runner; lifecycle hooks (beforeEach,
+// afterEach, beforeAll, afterAll) are scoped to their enclosing describe block.
+//
+// Usage:
+//   import { describe, it, beforeEach, afterEach } from 'argus';
+//
+//   describe("UserService", fn(): void {
+//       let mut state: string = "";
+//
+//       beforeEach(fn(): void { state = "fresh"; });
+//
+//       it("creates a user", fn(): void {
+//           test.equal(state, "fresh");
+//       });
+//   });
+
+// ── Types ──────────────────────────────────────────────────────────────────
+
+export struct TestCase {
+    name: string,
+    run: fn(): void,
+    skip: bool,
+}
+
+export struct Suite {
+    name: string,
+    cases: TestCase[],
+    before_each: fn(): void,
+    after_each: fn(): void,
+    before_all: fn(): void,
+    after_all: fn(): void,
+    children: Suite[],
+}
+
+export struct SuiteResult {
+    name: string,
+    passed: number,
+    failed: number,
+    skipped: number,
+    failures: Failure[],
+}
+
+export struct Failure {
+    suite: string,
+    case_name: string,
+    message: string,
+}
+
+// ── Registry ───────────────────────────────────────────────────────────────
+//
+// Argus maintains a mutable global suite stack during collection.
+// describe() pushes a new Suite, runs the builder fn (which registers its/hooks),
+// then pops and appends the finished suite to its parent (or root).
+
+let mut _root_suites: Suite[] = [];
+let mut _stack: Suite[] = [];
+
+fn _no_op(): void {}
+
+fn _current_suite(): Suite {
+    let len = _stack.length();
+    return _stack[len - 1];
+}
+
+fn _push_suite(name: string): void {
+    let s = Suite {
+        name: name,
+        cases: [],
+        before_each: _no_op,
+        after_each: _no_op,
+        before_all: _no_op,
+        after_all: _no_op,
+        children: [],
+    };
+    _stack = _stack.push(s);
+}
+
+fn _pop_suite(): Suite {
+    let len = _stack.length();
+    let s = _stack[len - 1];
+    _stack = _stack.slice(0, len - 1);
+    return s;
+}
+
+// ── Public API ─────────────────────────────────────────────────────────────
+
+export fn describe(name: string, builder: fn(): void): void {
+    _push_suite(name);
+    builder();
+    let suite = _pop_suite();
+    let depth = _stack.length();
+    if depth == 0 {
+        _root_suites = _root_suites.push(suite);
+    } else {
+        let parent = _current_suite();
+        parent.children = parent.children.push(suite);
+    }
+}
+
+export fn it(name: string, run: fn(): void): void {
+    let tc = TestCase { name: name, run: run, skip: false };
+    let s = _current_suite();
+    s.cases = s.cases.push(tc);
+}
+
+export fn xit(name: string, run: fn(): void): void {
+    let tc = TestCase { name: name, run: run, skip: true };
+    let s = _current_suite();
+    s.cases = s.cases.push(tc);
+}
+
+export fn beforeEach(hook: fn(): void): void {
+    let s = _current_suite();
+    s.before_each = hook;
+}
+
+export fn afterEach(hook: fn(): void): void {
+    let s = _current_suite();
+    s.after_each = hook;
+}
+
+export fn beforeAll(hook: fn(): void): void {
+    let s = _current_suite();
+    s.before_all = hook;
+}
+
+export fn afterAll(hook: fn(): void): void {
+    let s = _current_suite();
+    s.after_all = hook;
+}
+
+// ── Runner ─────────────────────────────────────────────────────────────────
+
+fn _run_suite(suite: Suite, prefix: string): SuiteResult {
+    let full_name = if prefix == "" { suite.name } else { prefix + " > " + suite.name };
+    let mut passed = 0;
+    let mut failed = 0;
+    let mut skipped = 0;
+    let mut failures: Failure[] = [];
+
+    suite.before_all();
+
+    let mut i = 0;
+    while i < suite.cases.length() {
+        let tc = suite.cases[i];
+        if tc.skip {
+            skipped = skipped + 1;
+        } else {
+            suite.before_each();
+            let result = test.noThrow(tc.run);
+            suite.after_each();
+            if result {
+                passed = passed + 1;
+            } else {
+                failed = failed + 1;
+                failures = failures.push(Failure {
+                    suite: full_name,
+                    case_name: tc.name,
+                    message: "test failed",
+                });
+            }
+        }
+        i = i + 1;
+    }
+
+    let mut j = 0;
+    while j < suite.children.length() {
+        let child_result = _run_suite(suite.children[j], full_name);
+        passed = passed + child_result.passed;
+        failed = failed + child_result.failed;
+        skipped = skipped + child_result.skipped;
+        failures = failures + child_result.failures;
+        j = j + 1;
+    }
+
+    suite.after_all();
+
+    return SuiteResult {
+        name: full_name,
+        passed: passed,
+        failed: failed,
+        skipped: skipped,
+        failures: failures,
+    };
+}
+
+export fn run(): SuiteResult[] {
+    let mut results: SuiteResult[] = [];
+    let mut i = 0;
+    while i < _root_suites.length() {
+        results = results.push(_run_suite(_root_suites[i], ""));
+        i = i + 1;
+    }
+    return results;
+}

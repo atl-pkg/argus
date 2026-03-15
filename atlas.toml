@@ -1,0 +1,11 @@
+[package]
+name = "argus"
+version = "0.1.0"
+description = "Official test framework for Atlas — describe/it blocks, lifecycle hooks, mocking, spies"
+authors = ["Atlas Team"]
+license = "MIT"
+repository = "https://github.com/atl-pkg/argus"
+keywords = ["test", "testing", "describe", "mock", "spy"]
+categories = ["testing"]
+
+[dependencies]

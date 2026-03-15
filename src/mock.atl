@@ -1,0 +1,105 @@
+// mock — lightweight mocking and spy utilities
+//
+// Spies wrap a function and record every call (args, return value, call count).
+// Mocks replace a function with a controlled stub that returns a preset value
+// or executes a custom implementation.
+//
+// Usage:
+//   import { spy, stub } from 'argus';
+//
+//   let s = spy(fn(x: number): number { return x * 2; });
+//   s.fn(3);
+//   test.equal(s.call_count(), 1);
+//   test.equal(s.last_return(), 6);
+//
+//   let m = stub(42);        // always returns 42
+//   test.equal(m.fn(), 42);
+
+export struct Call {
+    index: number,
+    returned: any,
+}
+
+export struct Spy {
+    fn: any,
+    calls: Call[],
+}
+
+impl Spy {
+    fn call_count(borrow self): number {
+        return self.calls.length();
+    }
+
+    fn was_called(borrow self): bool {
+        return self.calls.length() > 0;
+    }
+
+    fn last_return(borrow self): any {
+        let len = self.calls.length();
+        test.assert(len > 0, "spy was never called");
+        return self.calls[len - 1].returned;
+    }
+
+    fn nth_return(borrow self, n: number): any {
+        test.assert(n < self.calls.length(), "spy call index out of range");
+        return self.calls[n].returned;
+    }
+
+    fn reset(borrow self): Spy {
+        return Spy { fn: self.fn, calls: [] };
+    }
+}
+
+// spy wraps a 0-arg function. For typed spies, callers wrap their own fn
+// and pass the Spy's recorder as the outer fn.
+export fn spy(target: fn(): any): Spy {
+    let mut calls: Call[] = [];
+    let mut idx = 0;
+
+    let wrapper = fn(): any {
+        let result = target();
+        calls = calls.push(Call { index: idx, returned: result });
+        idx = idx + 1;
+        return result;
+    };
+
+    return Spy { fn: wrapper, calls: calls };
+}
+
+export struct Stub {
+    fn: fn(): any,
+    call_count: number,
+}
+
+impl Stub {
+    fn was_called(borrow self): bool {
+        return self.call_count > 0;
+    }
+}
+
+// stub creates a function that always returns the given value.
+export fn stub(value: any): Stub {
+    let mut count = 0;
+    let f = fn(): any {
+        count = count + 1;
+        return value;
+    };
+    return Stub { fn: f, call_count: count };
+}
+
+// stub_seq creates a function that returns values from a sequence in order,
+// cycling back to the last value when the sequence is exhausted.
+export fn stub_seq(values: any[]): Stub {
+    test.assert(values.length() > 0, "stub_seq requires at least one value");
+    let mut idx = 0;
+    let mut count = 0;
+    let f = fn(): any {
+        let v = values[idx];
+        if idx < values.length() - 1 {
+            idx = idx + 1;
+        }
+        count = count + 1;
+        return v;
+    };
+    return Stub { fn: f, call_count: count };
+}

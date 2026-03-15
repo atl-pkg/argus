@@ -1,0 +1,21 @@
+// argus — Official test framework for Atlas
+//
+// Structured test suites, lifecycle hooks, mocking, spies, snapshots,
+// and pluggable reporters — built on top of Atlas's built-in test.* primitives.
+//
+// https://github.com/atl-pkg/argus
+//
+// Quick start:
+//   import { describe, it, beforeEach } from 'argus';
+//   import { spy, stub } from 'argus';
+//   import { matchSnapshot } from 'argus';
+//   import { pretty } from 'argus';
+//
+//   describe("Math", fn(): void {
+//       it("adds correctly", fn(): void { test.equal(1 + 1, 2); });
+//   });
+
+export { describe, it, xit, beforeEach, afterEach, beforeAll, afterAll, run, Suite, SuiteResult, Failure, TestCase } from "./src/suite";
+export { spy, stub, stub_seq, Spy, Stub, Call } from "./src/mock";
+export { matchSnapshot, updateSnapshot } from "./src/snapshot";
+export { pretty, dot, json_report } from "./src/reporters";

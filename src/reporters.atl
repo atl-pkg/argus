@@ -1,0 +1,108 @@
+// reporters — output formatters for Argus suite results
+//
+// Pluggable reporters consume SuiteResult[] and produce output.
+// Built-in: pretty (human), dot (CI compact), json (machine).
+//
+// Usage:
+//   import { run } from 'argus';
+//   import { pretty, dot, json_report } from 'argus';
+//
+//   let results = run();
+//   pretty(results);    // colored human output
+//   dot(results);       // one dot per test (CI-friendly)
+//   json_report(results); // JSON to stdout
+
+import { SuiteResult, Failure } from "./suite";
+
+// ── Pretty ─────────────────────────────────────────────────────────────────
+
+fn _pad(s: string, width: number): string {
+    let mut out = s;
+    while out.length() < width {
+        out = out + " ";
+    }
+    return out;
+}
+
+export fn pretty(results: SuiteResult[]): void {
+    let mut total_passed = 0;
+    let mut total_failed = 0;
+    let mut total_skipped = 0;
+
+    let mut i = 0;
+    while i < results.length() {
+        let r = results[i];
+        console.log("\n  " + r.name);
+
+        let mut j = 0;
+        while j < r.failures.length() {
+            let f = r.failures[j];
+            console.log("    ✗ " + f.case_name + " — " + f.message);
+            j = j + 1;
+        }
+
+        total_passed = total_passed + r.passed;
+        total_failed = total_failed + r.failed;
+        total_skipped = total_skipped + r.skipped;
+        i = i + 1;
+    }
+
+    console.log("\n─────────────────────────────────────");
+    console.log(
+        "  passed:  " + total_passed.string() +
+        "  failed: " + total_failed.string() +
+        "  skipped: " + total_skipped.string()
+    );
+
+    if total_failed > 0 {
+        console.log("  FAIL");
+    } else {
+        console.log("  PASS");
+    }
+}
+
+// ── Dot ────────────────────────────────────────────────────────────────────
+
+export fn dot(results: SuiteResult[]): void {
+    let mut line = "";
+    let mut total_failed = 0;
+
+    let mut i = 0;
+    while i < results.length() {
+        let r = results[i];
+        let mut j = 0;
+        while j < r.passed {
+            line = line + ".";
+            j = j + 1;
+        }
+        let mut k = 0;
+        while k < r.failed {
+            line = line + "F";
+            k = k + 1;
+        }
+        let mut s = 0;
+        while s < r.skipped {
+            line = line + "S";
+            s = s + 1;
+        }
+        total_failed = total_failed + r.failed;
+        i = i + 1;
+    }
+
+    console.log(line);
+    if total_failed > 0 {
+        console.log("FAIL (" + total_failed.string() + " failures)");
+    } else {
+        console.log("ok");
+    }
+}
+
+// ── JSON ───────────────────────────────────────────────────────────────────
+
+export fn json_report(results: SuiteResult[]): void {
+    let encoded = Json.stringify(results);
+    match encoded {
+        Ok(s) => console.log(s),
+        Err(e) => console.log('{"error":"' + e + '"}'),
+    }
+}
