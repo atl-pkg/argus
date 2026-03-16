@@ -22,7 +22,7 @@ atlas install
 
 ## Import Surface
 
-```atlas
+```ts
 import { describe, it, beforeEach, run } from 'argus';  // suite structure — bare
 import { expect } from 'argus';                          // fluent assertions — bare
 import { mock } from 'argus';                            // mock.spy(), mock.stub(), mock.verify()
@@ -37,7 +37,7 @@ import { fixture } from 'argus';                         // fixture factory — 
 
 ## Quick Start
 
-```atlas
+```ts
 import { describe, it, beforeEach, run } from 'argus';
 import { expect } from 'argus';
 import { mock } from 'argus';
@@ -70,7 +70,7 @@ report.pretty(run());
 
 ### Suite Structure (bare imports)
 
-```atlas
+```ts
 describe(name, fn)                           // group related tests
 describeTags(name, tags[], fn)               // suite with tags for filtering
 it(name, fn)                                 // define a test case
@@ -85,7 +85,7 @@ reset()                                      // clear registered suites
 ```
 
 **Parametric tests:**
-```atlas
+```ts
 each([
     ["alice", 5],
     ["bob", 3],
@@ -100,7 +100,7 @@ each([
 
 ### expect — fluent assertions (bare import)
 
-```atlas
+```ts
 expect(value)
   .not()                          // invert next assertion
   .as("label")                    // attach label to failure messages
@@ -121,7 +121,7 @@ expect(value)
 ```
 
 **Chaining + negation:**
-```atlas
+```ts
 expect("hello world").toContain("hello").toHaveLength(11);
 expect(errors).not().toBeEmpty();
 expect(user.name).not().toEqual("anonymous");
@@ -131,7 +131,7 @@ expect(user.name).not().toEqual("anonymous");
 
 ### mock — mocking namespace
 
-```atlas
+```ts
 import { mock } from 'argus';
 
 // Spies — wrap a function and record every call
@@ -165,7 +165,7 @@ mock.verifyAs(s, "fetchUser").calledTimes(2);  // attach label for clearer failu
 
 ### snapshot — snapshot namespace
 
-```atlas
+```ts
 import { snapshot } from 'argus';
 
 snapshot.match("api response", value);   // writes on first run, asserts after
@@ -178,7 +178,7 @@ Snapshots stored at `__snapshots__/<name>.snap` as plain text (JSON-serialized).
 
 ### report — reporter namespace
 
-```atlas
+```ts
 import { report } from 'argus';
 
 let results = run();
@@ -197,7 +197,7 @@ let s = report.summarize(results);
 
 ### fixture — fresh per-test state (bare import)
 
-```atlas
+```ts
 import { fixture, fixtureWithTeardown } from 'argus';
 
 describe("DB tests", fn(): void {
