@@ -32,6 +32,8 @@
 export struct TestCase {
     name: string,
     run: fn(): void,
+    is_async: bool,
+    async_run: fn(): Promise<void>,
     skip: bool,
     focus: bool,
     tags: string[],
@@ -90,6 +92,7 @@ let mut _tag_filter: string[] = [];
 let mut _focus_mode: bool = false;
 
 function _no_op(): void {}
+async function _no_op_async(): Promise<void> {}
 
 function _stack_top(): Suite {
     return _stack[_stack.length() - 1];
@@ -179,6 +182,8 @@ export function describeOnly(name: string, builder: fn(): void): void {
         return TestCase {
             name: tc.name,
             run: tc.run,
+            is_async: tc.is_async,
+            async_run: tc.async_run,
             skip: tc.skip,
             focus: true,
             tags: tc.tags,
@@ -219,6 +224,17 @@ export function itOpts(
     retry: number,
 ): void {
     _register_case(name, run, false, false, tags, timeout_ms, retry);
+}
+
+// itAsync — define an async test case. Use for tests that await I/O or other
+// async operations. Run via runAsync() (not run()).
+//
+//   itAsync("fetches user", async fn(): Promise<void> {
+//       let resp = await Http.get("https://api.example.com/user/1");
+//       expect(resp.status).toEqual(200);
+//   });
+export function itAsync(name: string, run: fn(): Promise<void>): void {
+    _register_async_case(name, run, false, false, _tag_filter.slice(0, 0), 5000, 0);
 }
 
 // xit — skip a test case (mark pending).
@@ -274,6 +290,33 @@ function _register_case(
     let tc = TestCase {
         name: name,
         run: run,
+        is_async: false,
+        async_run: _no_op_async,
+        skip: skip,
+        focus: focus,
+        tags: tags,
+        timeout_ms: timeout_ms,
+        retry: retry,
+    };
+    let mut top = _stack[_stack.length() - 1];
+    top.cases = top.cases.push(tc);
+    _stack = _stack.slice(0, _stack.length() - 1).push(top);
+}
+
+function _register_async_case(
+    name: string,
+    run: fn(): Promise<void>,
+    skip: bool,
+    focus: bool,
+    tags: string[],
+    timeout_ms: number,
+    retry: number,
+): void {
+    let tc = TestCase {
+        name: name,
+        run: _no_op,
+        is_async: true,
+        async_run: run,
         skip: skip,
         focus: focus,
         tags: tags,
@@ -356,9 +399,99 @@ function _run_suite(suite: Suite, prefix: string): SuiteResult {
     };
 }
 
-// run — execute all registered suites. Returns results for reporters.
+// run — execute all registered suites (sync only). Returns results for reporters.
+// itAsync() cases are skipped — use runAsync() if your suite contains async tests.
 export function run(): SuiteResult[] {
     return _root_suites.map(fn(suite: Suite): SuiteResult { return _run_suite(suite, ""); });
+}
+
+// ── Async runner ───────────────────────────────────────────────────────────
+
+// Run a single case asynchronously. Sync cases use the same noThrow capture
+// path. Async cases await tc.async_run() with a timeout race.
+async function _run_case_async(tc: TestCase, before: fn(): void, after: fn(): void): Promise<Option<string>> {
+    _test_has_failed = false;
+    _last_failure_msg = "unexpected panic";
+
+    if tc.is_async {
+        // Race the async test body against a timeout.
+        // timeout() rejects the wrapping future if tc.async_run() takes too long.
+        let body = tc.async_run();
+        let timed = timeout(body, tc.timeout_ms);
+        await timed;
+        if futureIsRejected(timed) {
+            _capture_failure(`"${tc.name}" exceeded timeout of ${tc.timeout_ms}ms`);
+        }
+    } else {
+        test.noThrow(fn(): void {
+            before();
+            tc.run();
+            after();
+        });
+    }
+
+    if _test_has_failed {
+        return Some(_last_failure_msg);
+    }
+    return None;
+}
+
+async function _run_suite_async(suite: Suite, prefix: string): Promise<SuiteResult> {
+    let full_name = if prefix == "" { suite.name } else { prefix + " › " + suite.name };
+    let mut passed = 0;
+    let mut failed = 0;
+    let mut skipped = 0;
+    let mut failures: Failure[] = [];
+    let mut passing: string[] = [];
+    let start_ms = performance.now();
+
+    suite.before_all();
+
+    for tc of suite.cases {
+        if tc.skip || !_tags_match(tc.tags) || (_focus_mode && !tc.focus) {
+            skipped = skipped + 1;
+        } else {
+            let result = await _run_case_async(tc, suite.before_each, suite.after_each);
+            match result {
+                Some(msg) => {
+                    failed = failed + 1;
+                    failures = failures.push(Failure {
+                        suite: full_name,
+                        case_name: tc.name,
+                        message: msg,
+                    });
+                },
+                None => {
+                    passed = passed + 1;
+                    passing = passing.push(tc.name);
+                },
+            }
+        }
+    }
+
+    suite.after_all();
+
+    let duration = performance.now() - start_ms;
+    return SuiteResult {
+        name: full_name,
+        passed: passed,
+        failed: failed,
+        skipped: skipped,
+        failures: failures,
+        passing: passing,
+        duration_ms: duration,
+    };
+}
+
+// runAsync — execute all registered suites including async test cases.
+// Returns a Promise that resolves with results when all suites complete.
+export async function runAsync(): Promise<SuiteResult[]> {
+    let mut results: SuiteResult[] = [];
+    for suite of _root_suites {
+        let r = await _run_suite_async(suite, "");
+        results = results.push(r);
+    }
+    return results;
 }
 
 // runAndExit — run all suites, print pretty report, exit 0/1 for CI.

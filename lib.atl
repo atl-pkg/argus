@@ -14,9 +14,9 @@
 // Suite — bare imports (test structure reads best without a prefix)
 export {
     describe, describeTags, describeOnly,
-    it, itOnly, itOpts, xit, each,
+    it, itOnly, itAsync, itOpts, xit, each,
     beforeEach, afterEach, beforeAll, afterAll,
-    run, runAndExit, reset, filterTags,
+    run, runAsync, runAndExit, reset, filterTags,
     Suite, TestCase, SuiteResult, Failure,
 } from "./src/suite";
 
