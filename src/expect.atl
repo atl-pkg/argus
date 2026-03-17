@@ -34,15 +34,15 @@ export class Expect {
     // ── Equality ──────────────────────────────────────────────────────────
 
     function toEqual(expected: any): Expect {
-        let pass = this.value == expected;
-        _check(this, pass, "toEqual", `${expected}`);
+        let pass = reflect.deepEquals(this.value, expected);
+        _check_eq(this, pass, "toEqual", expected);
         return new Expect { value: this.value, label: this.label, negated: false };
     }
 
     function toBe(expected: any): Expect {
         // Reference/value identity — same as toEqual for Atlas value semantics.
         let pass = this.value == expected;
-        _check(this, pass, "toBe", `${expected}`);
+        _check_eq(this, pass, "toBe", expected);
         return new Expect { value: this.value, label: this.label, negated: false };
     }
 
@@ -203,13 +203,44 @@ function _label(e: Expect): string {
     return "expect[" + e.label + "](" + `${e.value}` + ")";
 }
 
+// Build a structured diff string for struct-like values using reflect + Json.
+// When both actual and expected have inspectable fields, serializes both to
+// JSON so the failure message shows the full value, not just a template string.
+// Returns "" for primitives (the standard repr is already sufficient).
+function _value_diff(actual: any, expected: any): string {
+    if reflect.fields(actual).length() == 0 {
+        return "";
+    }
+    let actual_json = Json.stringify(actual).unwrapOr(reflect.valueToString(actual));
+    let expected_json = Json.stringify(expected).unwrapOr(reflect.valueToString(expected));
+    return "\n  actual:   " + actual_json + "\n  expected: " + expected_json;
+}
+
+// _check — evaluates pass/fail, builds message, records via capture bridge,
+//          then panics so test.noThrow in the runner can catch and continue.
 function _check(e: Expect, raw_pass: bool, matcher: string, expected_repr: string): void {
     let pass = if e.negated { !raw_pass } else { raw_pass };
     if !pass {
         let not_str = if e.negated { ".not()" } else { "" };
-        let msg = _label(e) + not_str + "." + matcher + "(" + expected_repr + ") — FAILED";
+        let base_msg = _label(e) + not_str + "." + matcher + "(" + expected_repr + ") — FAILED";
+        let msg = base_msg;
         // Record the message in the runner's capture bridge BEFORE panicking,
         // so test.noThrow can catch the panic and the runner still has the message.
+        _capture_failure(msg);
+        test.assert(false, msg);
+    }
+}
+
+// _check_eq — equality-specific variant that appends a JSON diff for struct
+//             values where the repr alone is too opaque to debug.
+function _check_eq(e: Expect, raw_pass: bool, matcher: string, expected: any): void {
+    let pass = if e.negated { !raw_pass } else { raw_pass };
+    if !pass {
+        let not_str = if e.negated { ".not()" } else { "" };
+        let expected_repr = reflect.valueToString(expected);
+        let base_msg = _label(e) + not_str + "." + matcher + "(" + expected_repr + ") — FAILED";
+        let diff = _value_diff(e.value, expected);
+        let msg = base_msg + diff;
         _capture_failure(msg);
         test.assert(false, msg);
     }
