@@ -63,6 +63,18 @@ export struct SuiteResult {
     duration_ms: number,
 }
 
+// ── Failure capture bridge ─────────────────────────────────────────────────
+// expect._check() calls _capture_failure() before test.assert(false) so the
+// runner can record the message even after the panic is caught by test.noThrow.
+
+let mut _test_has_failed: bool = false;
+let mut _last_failure_msg: string = "";
+
+export function _capture_failure(msg: string): void {
+    _test_has_failed = true;
+    _last_failure_msg = msg;
+}
+
 // ── Registry ───────────────────────────────────────────────────────────────
 
 let mut _root_suites: Suite[] = [];
@@ -113,8 +125,13 @@ function _has_tag(tags: string[], target: string): bool {
     return false;
 }
 
+// Untagged tests (case_tags is empty) always run regardless of filter —
+// tag filters are additive, not exclusive. Matches Jest/Vitest behavior.
 function _tags_match(case_tags: string[]): bool {
     if _tag_filter.length() == 0 {
+        return true;
+    }
+    if case_tags.length() == 0 {
         return true;
     }
     for tag of _tag_filter {
@@ -223,10 +240,26 @@ function _register_case(
 
 // ── Runner ─────────────────────────────────────────────────────────────────
 
-function _run_case_with_retry(tc: TestCase, before: fn(): void, after: fn(): void): void {
-    before();
-    tc.run();
-    after();
+// Run a single test case with hooks, capturing any failure.
+// Returns None if the test passed, Some(message) if it failed.
+//
+// test.noThrow catches panics from test.assert(false) — preventing a single
+// failing test from killing the entire suite run. The _capture_failure bridge
+// records the message before the panic so we can surface it in SuiteResult.
+function _run_case(tc: TestCase, before: fn(): void, after: fn(): void): Option<string> {
+    _test_has_failed = false;
+    _last_failure_msg = "unexpected panic";
+
+    test.noThrow(fn(): void {
+        before();
+        tc.run();
+        after();
+    });
+
+    if _test_has_failed {
+        return Some(_last_failure_msg);
+    }
+    return None;
 }
 
 function _run_suite(suite: Suite, prefix: string): SuiteResult {
@@ -243,8 +276,20 @@ function _run_suite(suite: Suite, prefix: string): SuiteResult {
         if tc.skip || !_tags_match(tc.tags) {
             skipped = skipped + 1;
         } else {
-            _run_case_with_retry(tc, suite.before_each, suite.after_each);
-            passed = passed + 1;
+            let result = _run_case(tc, suite.before_each, suite.after_each);
+            match result {
+                Some(msg) => {
+                    failed = failed + 1;
+                    failures = failures.push(Failure {
+                        suite: full_name,
+                        case_name: tc.name,
+                        message: msg,
+                    });
+                },
+                None => {
+                    passed = passed + 1;
+                },
+            }
         }
     }
 

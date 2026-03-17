@@ -12,6 +12,8 @@
 //   expect(result).toBeOk();
 //   expect(list).toHaveLength(3).toContain("alice");
 
+import { _capture_failure } from "./suite";
+
 // ── Core class ─────────────────────────────────────────────────────────────
 
 export class Expect {
@@ -201,6 +203,9 @@ function _check(e: Expect, raw_pass: bool, matcher: string, expected_repr: strin
     if !pass {
         let not_str = if e.negated { ".not()" } else { "" };
         let msg = _label(e) + not_str + "." + matcher + "(" + expected_repr + ") — FAILED";
+        // Record the message in the runner's capture bridge BEFORE panicking,
+        // so test.noThrow can catch the panic and the runner still has the message.
+        _capture_failure(msg);
         test.assert(false, msg);
     }
 }
