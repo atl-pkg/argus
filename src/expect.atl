@@ -119,7 +119,9 @@ export class Expect {
 
     function toMatch(pattern: string): Expect {
         let s: string = `${this.value}`;
-        let pass = s.includes(pattern);
+        // Regex.test(pattern, text) accepts a raw pattern string and returns false
+        // on compile error rather than panicking — safe for one-off checks.
+        let pass = Regex.test(pattern, s);
         _check(this, pass, "toMatch", pattern);
         return new Expect { value: this.value, label: this.label, negated: false };
     }
@@ -178,7 +180,10 @@ export class Expect {
     // ── Array ─────────────────────────────────────────────────────────────
 
     function toContainItem(item: any): Expect {
-        test.contains(this.value, item);
+        // Use reflect.deepEquals for per-element comparison to respect negation
+        // via _check(), unlike a raw test.contains() which bypasses .not().
+        let found = this.value.filter(fn(el: any): bool { return reflect.deepEquals(el, item); }).length() > 0;
+        _check(this, found, "toContainItem", `${item}`);
         return new Expect { value: this.value, label: this.label, negated: false };
     }
 }
