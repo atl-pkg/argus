@@ -16,7 +16,7 @@ export {
     describe, describeTags,
     it, itOpts, xit, each,
     beforeEach, afterEach, beforeAll, afterAll,
-    run, reset, filterTags,
+    run, runAndExit, reset, filterTags,
     Suite, TestCase, SuiteResult, Failure,
 } from "./src/suite";
 

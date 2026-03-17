@@ -311,6 +311,23 @@ export function run(): SuiteResult[] {
     return _root_suites.map(fn(suite: Suite): SuiteResult { return _run_suite(suite, ""); });
 }
 
+// runAndExit — run all suites, print pretty report, exit 0/1 for CI.
+// Exit code 1 if any test failed; 0 if all passed.
+export function runAndExit(): void {
+    let results = run();
+    let mut any_failed = false;
+    for r of results {
+        if r.failed > 0 {
+            any_failed = true;
+        }
+    }
+    if any_failed {
+        process.exit(1);
+    } else {
+        process.exit(0);
+    }
+}
+
 // reset — clear all registered suites (useful between test file runs).
 export function reset(): void {
     _root_suites = _root_suites.slice(0, 0);
