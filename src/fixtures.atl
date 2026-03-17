@@ -11,72 +11,72 @@
 //   import { fixture, Fixture } from 'argus';
 //
 //   describe("UserService", fn(): void {
-//       let mut db = fixture(fn(): string { return "empty_db"; });
+//       let mut db = fixture<string>(fn(): string { return "empty_db"; });
 //
 //       beforeEach(fn(): void { db = db.setup(); });
 //
 //       it("reads state", fn(): void {
-//           test.equal(db.value(), "empty_db");
+//           test.equal(db.value(), "empty_db");  // db.value() is typed as string
 //       });
 //   });
 //
 // For fixtures that need teardown:
-//   let mut conn = fixtureWithTeardown(
-//       fn(): string { return openConnection(); },
-//       fn(c: any): void { closeConnection(c); },
+//   let mut conn = fixtureWithTeardown<Connection>(
+//       fn(): Connection { return openConnection(); },
+//       fn(c: Connection): void { c.close(); },
 //   );
 //   beforeEach(fn(): void { conn = conn.setup(); });
 //   afterEach(fn(): void  { conn = conn.teardown(); });
 
-export class Fixture {
-    build: (): any;
-    teardown_fn: (v: any): void;
-    _current: any;
+export class Fixture<T> {
+    build: (): T;
+    teardown_fn: (v: T): void;
+    _current: T;
     _ready: bool;
 
-    // setup — call in beforeEach to build a fresh value. Returns new Fixture.
-    function setup(): Fixture {
-        return new Fixture { build: this.build, teardown_fn: this.teardown_fn, _current: this.build(), _ready: true };
+    // setup — call in beforeEach to build a fresh value. Returns new Fixture<T>.
+    function setup(): Fixture<T> {
+        return new Fixture<T> { build: this.build, teardown_fn: this.teardown_fn, _current: this.build(), _ready: true };
     }
 
-    // value — call inside it() to access the current fixture value.
-    function value(): any {
+    // value — call inside it() to access the current fixture value. Returns T.
+    function value(): T {
         test.assert(this._ready, "fixture.value() called before fixture.setup() — did you add setup() to beforeEach?");
         return this._current;
     }
 
-    // teardown — call in afterEach if the fixture needs cleanup. Returns new Fixture.
-    function teardown(): Fixture {
+    // teardown — call in afterEach if the fixture needs cleanup. Returns new Fixture<T>.
+    function teardown(): Fixture<T> {
         if this._ready {
             this.teardown_fn(this._current);
         }
-        return new Fixture { build: this.build, teardown_fn: this.teardown_fn, _current: this._current, _ready: false };
+        return new Fixture<T> { build: this.build, teardown_fn: this.teardown_fn, _current: this._current, _ready: false };
     }
 
-    // reset — manually clear the current value. Returns new Fixture.
-    function reset(): Fixture {
-        return new Fixture { build: this.build, teardown_fn: this.teardown_fn, _current: this._current, _ready: false };
+    // reset — manually clear the current value without teardown. Returns new Fixture<T>.
+    function reset(): Fixture<T> {
+        return new Fixture<T> { build: this.build, teardown_fn: this.teardown_fn, _current: this._current, _ready: false };
     }
 }
 
-function _no_teardown(v: any): void {}
+function _no_teardown<T>(v: T): void {}
 
-// fixture — builds a fresh value before each test. No teardown.
-export function fixture(factory: (): any): Fixture {
-    return new Fixture {
+// fixture<T> — builds a fresh value before each test. No teardown.
+export function fixture<T>(factory: (): T): Fixture<T> {
+    return new Fixture<T> {
         build: factory,
-        teardown_fn: _no_teardown,
-        _current: "",
+        teardown_fn: _no_teardown<T>,
+        _current: factory(),
         _ready: false,
     };
 }
 
-// fixtureWithTeardown — like fixture, but calls teardown_fn(value) in afterEach.
-export function fixtureWithTeardown(factory: (): any, teardown: (v: any): void): Fixture {
-    return new Fixture {
+// fixtureWithTeardown<T> — like fixture, but calls teardown_fn(value) in afterEach.
+export function fixtureWithTeardown<T>(factory: (): T, teardown: (v: T): void): Fixture<T> {
+    return new Fixture<T> {
         build: factory,
         teardown_fn: teardown,
-        _current: "",
+        _current: factory(),
         _ready: false,
     };
 }
