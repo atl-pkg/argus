@@ -11,9 +11,9 @@
 //   import { fixture, Fixture } from 'argus';
 //
 //   describe("UserService", fn(): void {
-//       let db = fixture(fn(): string { return "empty_db"; });
+//       let mut db = fixture(fn(): string { return "empty_db"; });
 //
-//       beforeEach(fn(): void { db.setup(); });
+//       beforeEach(fn(): void { db = db.setup(); });
 //
 //       it("reads state", fn(): void {
 //           test.equal(db.value(), "empty_db");
@@ -21,52 +21,49 @@
 //   });
 //
 // For fixtures that need teardown:
-//   let conn = fixtureWithTeardown(
+//   let mut conn = fixtureWithTeardown(
 //       fn(): string { return openConnection(); },
 //       fn(c: any): void { closeConnection(c); },
 //   );
-//   beforeEach(fn(): void { conn.setup(); });
-//   afterEach(fn(): void  { conn.teardown(); });
+//   beforeEach(fn(): void { conn = conn.setup(); });
+//   afterEach(fn(): void  { conn = conn.teardown(); });
 
-export struct Fixture {
-    build: (): any,
-    teardown_fn: (v: any): void,
-    _current: any,
-    _ready: bool,
-}
+export class Fixture {
+    build: (): any;
+    teardown_fn: (v: any): void;
+    _current: any;
+    _ready: bool;
 
-impl Fixture {
-    // setup — call in beforeEach to build a fresh value.
-    fn setup(borrow self): void {
-        self._current = self.build();
-        self._ready = true;
+    // setup — call in beforeEach to build a fresh value. Returns new Fixture.
+    function setup(): Fixture {
+        return new Fixture { build: this.build, teardown_fn: this.teardown_fn, _current: this.build(), _ready: true };
     }
 
     // value — call inside it() to access the current fixture value.
-    fn value(borrow self): any {
-        test.assert(self._ready, "fixture.value() called before fixture.setup() — did you add setup() to beforeEach?");
-        return self._current;
+    function value(): any {
+        test.assert(this._ready, "fixture.value() called before fixture.setup() — did you add setup() to beforeEach?");
+        return this._current;
     }
 
-    // teardown — call in afterEach if the fixture needs cleanup.
-    fn teardown(borrow self): void {
-        if self._ready {
-            self.teardown_fn(self._current);
-            self._ready = false;
+    // teardown — call in afterEach if the fixture needs cleanup. Returns new Fixture.
+    function teardown(): Fixture {
+        if this._ready {
+            this.teardown_fn(this._current);
         }
+        return new Fixture { build: this.build, teardown_fn: this.teardown_fn, _current: this._current, _ready: false };
     }
 
-    // reset — manually clear the current value.
-    fn reset(borrow self): void {
-        self._ready = false;
+    // reset — manually clear the current value. Returns new Fixture.
+    function reset(): Fixture {
+        return new Fixture { build: this.build, teardown_fn: this.teardown_fn, _current: this._current, _ready: false };
     }
 }
 
-fn _no_teardown(v: any): void {}
+function _no_teardown(v: any): void {}
 
 // fixture — builds a fresh value before each test. No teardown.
-export fn fixture(factory: (): any): Fixture {
-    return Fixture {
+export function fixture(factory: (): any): Fixture {
+    return new Fixture {
         build: factory,
         teardown_fn: _no_teardown,
         _current: "",
@@ -75,8 +72,8 @@ export fn fixture(factory: (): any): Fixture {
 }
 
 // fixtureWithTeardown — like fixture, but calls teardown_fn(value) in afterEach.
-export fn fixtureWithTeardown(factory: (): any, teardown: (v: any): void): Fixture {
-    return Fixture {
+export function fixtureWithTeardown(factory: (): any, teardown: (v: any): void): Fixture {
+    return new Fixture {
         build: factory,
         teardown_fn: teardown,
         _current: "",

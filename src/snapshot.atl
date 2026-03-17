@@ -10,7 +10,7 @@
 // Snapshots are stored as plain text at:
 //   __snapshots__/<name>.snap
 
-fn _serialize(value: any): string {
+function _serialize(value: any): string {
     match Json.stringify(value) {
         Ok(s) => { return s; },
         Err(_) => { return "<unserializable>"; }
@@ -21,10 +21,8 @@ let _snapshot_dir: string = "__snapshots__";
 
 // ── SnapshotNamespace ──────────────────────────────────────────────────────
 
-export struct SnapshotNamespace {}
-
-impl SnapshotNamespace {
-    fn assert_match(borrow self, name: string, value: any): void {
+export class SnapshotNamespace {
+    function assert_match(name: string, value: any): void {
         let serialized = _serialize(value);
         let path = _snapshot_dir + "/" + name + ".snap";
 
@@ -47,7 +45,7 @@ impl SnapshotNamespace {
         }
     }
 
-    fn update(borrow self, name: string, value: any): void {
+    function update(name: string, value: any): void {
         let serialized = _serialize(value);
         let path = _snapshot_dir + "/" + name + ".snap";
         let write_result = file.write(path, serialized);
@@ -64,4 +62,4 @@ impl SnapshotNamespace {
 
 // ── Singleton ──────────────────────────────────────────────────────────────
 
-export let snapshot: SnapshotNamespace = SnapshotNamespace {};
+export let snapshot: SnapshotNamespace = new SnapshotNamespace {};

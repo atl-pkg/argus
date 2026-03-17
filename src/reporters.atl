@@ -25,12 +25,12 @@ export struct RunSummary {
     all_passed: bool,
 }
 
-fn _summarize(results: SuiteResult[]): RunSummary {
+function _summarize(results: SuiteResult[]): RunSummary {
     let mut passed = 0;
     let mut failed = 0;
     let mut skipped = 0;
     let mut duration = 0;
-    for r in results {
+    for r of results {
         passed = passed + r.passed;
         failed = failed + r.failed;
         skipped = skipped + r.skipped;
@@ -47,10 +47,8 @@ fn _summarize(results: SuiteResult[]): RunSummary {
 
 // ── ReportNamespace ────────────────────────────────────────────────────────
 
-export struct ReportNamespace {}
-
-impl ReportNamespace {
-    fn summarize(borrow self, results: SuiteResult[]): RunSummary {
+export class ReportNamespace {
+    function summarize(results: SuiteResult[]): RunSummary {
         return _summarize(results);
     }
 
@@ -63,10 +61,10 @@ impl ReportNamespace {
     //   ──────────────────────────────────────────
     //   passed: 4  failed: 1  skipped: 0  (12ms)
     //   FAIL
-    fn pretty(borrow self, results: SuiteResult[]): void {
-        for r in results {
+    function pretty(results: SuiteResult[]): void {
+        for r of results {
             console.log(`\n  ${r.name}  (${r.duration_ms}ms)`);
-            for f in r.failures {
+            for f of r.failures {
                 console.log(`    ✗ ${f.case_name}`);
                 console.log(`      ${f.message}`);
             }
@@ -83,15 +81,15 @@ impl ReportNamespace {
     }
 
     // verbose — like pretty, but also prints passing test names.
-    fn verbose(borrow self, results: SuiteResult[]): void {
-        for r in results {
+    function verbose(results: SuiteResult[]): void {
+        for r of results {
             console.log(`\n  ${r.name}`);
             let mut k = 0;
             while k < r.passed {
                 console.log("    ✓ (passed)");
                 k = k + 1;
             }
-            for f in r.failures {
+            for f of r.failures {
                 console.log(`    ✗ ${f.case_name} — ${f.message}`);
             }
         }
@@ -103,9 +101,9 @@ impl ReportNamespace {
     //
     //   .....F..S.
     //   FAIL (1 failure)
-    fn dot(borrow self, results: SuiteResult[]): void {
+    function dot(results: SuiteResult[]): void {
         let mut line = "";
-        for r in results {
+        for r of results {
             let mut j = 0;
             while j < r.passed { line = line + "."; j = j + 1; }
             let mut k = 0;
@@ -132,7 +130,7 @@ impl ReportNamespace {
     //     ---
     //     message: assertion failed
     //     ...
-    fn tap(borrow self, results: SuiteResult[]): void {
+    function tap(results: SuiteResult[]): void {
         let sum = _summarize(results);
         let total = sum.passed + sum.failed + sum.skipped;
 
@@ -140,7 +138,7 @@ impl ReportNamespace {
         console.log("1.." + total.toString());
 
         let mut test_num = 1;
-        for r in results {
+        for r of results {
             let mut p = 0;
             while p < r.passed {
                 console.log(`ok ${test_num} - ${r.name} (passed)`);
@@ -148,7 +146,7 @@ impl ReportNamespace {
                 p = p + 1;
             }
 
-            for f in r.failures {
+            for f of r.failures {
                 console.log(`not ok ${test_num} - ${r.name} › ${f.case_name}`);
                 console.log("  ---");
                 console.log(`  message: ${f.message}`);
@@ -167,7 +165,7 @@ impl ReportNamespace {
     }
 
     // json — machine-readable JSON output: { summary, suites }
-    fn json(borrow self, results: SuiteResult[]): void {
+    function json(results: SuiteResult[]): void {
         let sum = _summarize(results);
         let payload = {
             summary: sum,
@@ -183,4 +181,4 @@ impl ReportNamespace {
 
 // ── Singleton ──────────────────────────────────────────────────────────────
 
-export let report: ReportNamespace = ReportNamespace {};
+export let report: ReportNamespace = new ReportNamespace {};

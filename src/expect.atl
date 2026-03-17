@@ -12,195 +12,191 @@
 //   expect(result).toBeOk();
 //   expect(list).toHaveLength(3).toContain("alice");
 
-// ── Core struct ────────────────────────────────────────────────────────────
+// ── Core class ─────────────────────────────────────────────────────────────
 
-export struct Expect {
-    value: any,
-    label: string,
-    negated: bool,
-}
+export class Expect {
+    value: any;
+    label: string;
+    negated: bool;
 
-impl Expect {
     // Invert the next assertion.
-    fn not(borrow self): Expect {
-        return Expect { value: self.value, label: self.label, negated: !self.negated };
+    function not(): Expect {
+        return new Expect { value: this.value, label: this.label, negated: !this.negated };
     }
 
     // Attach a label shown in failure messages: expect(x).withLabel("user count").toEqual(3)
-    fn withLabel(borrow self, label: string): Expect {
-        return Expect { value: self.value, label: label, negated: self.negated };
+    function withLabel(label: string): Expect {
+        return new Expect { value: this.value, label: label, negated: this.negated };
     }
 
     // ── Equality ──────────────────────────────────────────────────────────
 
-    fn toEqual(borrow self, expected: any): Expect {
-        let pass = self.value == expected;
-        _check(self, pass, "toEqual", `${expected}`);
-        return Expect { value: self.value, label: self.label, negated: false };
+    function toEqual(expected: any): Expect {
+        let pass = this.value == expected;
+        _check(this, pass, "toEqual", `${expected}`);
+        return new Expect { value: this.value, label: this.label, negated: false };
     }
 
-    fn toBe(borrow self, expected: any): Expect {
+    function toBe(expected: any): Expect {
         // Reference/value identity — same as toEqual for Atlas value semantics.
-        let pass = self.value == expected;
-        _check(self, pass, "toBe", `${expected}`);
-        return Expect { value: self.value, label: self.label, negated: false };
+        let pass = this.value == expected;
+        _check(this, pass, "toBe", `${expected}`);
+        return new Expect { value: this.value, label: this.label, negated: false };
     }
 
     // ── Boolean ───────────────────────────────────────────────────────────
 
-    fn toBeTrue(borrow self): Expect {
-        let pass = self.value == true;
-        _check(self, pass, "toBeTrue", "true");
-        return Expect { value: self.value, label: self.label, negated: false };
+    function toBeTrue(): Expect {
+        let pass = this.value == true;
+        _check(this, pass, "toBeTrue", "true");
+        return new Expect { value: this.value, label: this.label, negated: false };
     }
 
-    fn toBeFalse(borrow self): Expect {
-        let pass = self.value == false;
-        _check(self, pass, "toBeFalse", "false");
-        return Expect { value: self.value, label: self.label, negated: false };
+    function toBeFalse(): Expect {
+        let pass = this.value == false;
+        _check(this, pass, "toBeFalse", "false");
+        return new Expect { value: this.value, label: this.label, negated: false };
     }
 
     // ── Numeric comparisons ───────────────────────────────────────────────
 
-    fn toBeGreaterThan(borrow self, n: number): Expect {
-        let pass = self.value > n;
-        _check(self, pass, "toBeGreaterThan", `${n}`);
-        return Expect { value: self.value, label: self.label, negated: false };
+    function toBeGreaterThan(n: number): Expect {
+        let pass = this.value > n;
+        _check(this, pass, "toBeGreaterThan", `${n}`);
+        return new Expect { value: this.value, label: this.label, negated: false };
     }
 
-    fn toBeGreaterThanOrEqual(borrow self, n: number): Expect {
-        let pass = self.value >= n;
-        _check(self, pass, "toBeGreaterThanOrEqual", `${n}`);
-        return Expect { value: self.value, label: self.label, negated: false };
+    function toBeGreaterThanOrEqual(n: number): Expect {
+        let pass = this.value >= n;
+        _check(this, pass, "toBeGreaterThanOrEqual", `${n}`);
+        return new Expect { value: this.value, label: this.label, negated: false };
     }
 
-    fn toBeLessThan(borrow self, n: number): Expect {
-        let pass = n > self.value;
-        _check(self, pass, "toBeLessThan", `${n}`);
-        return Expect { value: self.value, label: self.label, negated: false };
+    function toBeLessThan(n: number): Expect {
+        let pass = n > this.value;
+        _check(this, pass, "toBeLessThan", `${n}`);
+        return new Expect { value: this.value, label: this.label, negated: false };
     }
 
-    fn toBeLessThanOrEqual(borrow self, n: number): Expect {
-        let pass = self.value <= n;
-        _check(self, pass, "toBeLessThanOrEqual", `${n}`);
-        return Expect { value: self.value, label: self.label, negated: false };
+    function toBeLessThanOrEqual(n: number): Expect {
+        let pass = this.value <= n;
+        _check(this, pass, "toBeLessThanOrEqual", `${n}`);
+        return new Expect { value: this.value, label: this.label, negated: false };
     }
 
-    fn toApprox(borrow self, expected: number, epsilon: number): Expect {
-        let diff = self.value - expected;
+    function toApprox(expected: number, epsilon: number): Expect {
+        let diff = this.value - expected;
         let abs_diff = if diff < 0 { diff * -1 } else { diff };
         let pass = abs_diff <= epsilon;
-        _check(self, pass, "toApprox(ε=" + `${epsilon}` + ")", `${expected}`);
-        return Expect { value: self.value, label: self.label, negated: false };
+        _check(this, pass, "toApprox(ε=" + `${epsilon}` + ")", `${expected}`);
+        return new Expect { value: this.value, label: this.label, negated: false };
     }
 
     // ── String ────────────────────────────────────────────────────────────
 
-    fn toContain(borrow self, substring: string): Expect {
-        let s: string = `${self.value}`;
+    function toContain(substring: string): Expect {
+        let s: string = `${this.value}`;
         let pass = s.includes(substring);
-        _check(self, pass, "toContain", substring);
-        return Expect { value: self.value, label: self.label, negated: false };
+        _check(this, pass, "toContain", substring);
+        return new Expect { value: this.value, label: this.label, negated: false };
     }
 
-    fn toStartWith(borrow self, prefix: string): Expect {
-        let s: string = `${self.value}`;
+    function toStartWith(prefix: string): Expect {
+        let s: string = `${this.value}`;
         let pass = s.startsWith(prefix);
-        _check(self, pass, "toStartWith", prefix);
-        return Expect { value: self.value, label: self.label, negated: false };
+        _check(this, pass, "toStartWith", prefix);
+        return new Expect { value: this.value, label: this.label, negated: false };
     }
 
-    fn toEndWith(borrow self, suffix: string): Expect {
-        let s: string = `${self.value}`;
+    function toEndWith(suffix: string): Expect {
+        let s: string = `${this.value}`;
         let pass = s.endsWith(suffix);
-        _check(self, pass, "toEndWith", suffix);
-        return Expect { value: self.value, label: self.label, negated: false };
+        _check(this, pass, "toEndWith", suffix);
+        return new Expect { value: this.value, label: this.label, negated: false };
     }
 
-    fn toMatch(borrow self, pattern: string): Expect {
-        let s: string = `${self.value}`;
+    function toMatch(pattern: string): Expect {
+        let s: string = `${this.value}`;
         let pass = s.includes(pattern);
-        _check(self, pass, "toMatch", pattern);
-        return Expect { value: self.value, label: self.label, negated: false };
+        _check(this, pass, "toMatch", pattern);
+        return new Expect { value: this.value, label: this.label, negated: false };
     }
 
     // ── Length ────────────────────────────────────────────────────────────
 
-    fn toHaveLength(borrow self, n: number): Expect {
-        let s: string = `${self.value}`;
-        let actual_len = s.length();
+    function toHaveLength(n: number): Expect {
+        let actual_len = this.value.length();
         let pass = actual_len == n;
-        _check(self, pass, "toHaveLength", `${n}`);
-        return Expect { value: self.value, label: self.label, negated: false };
+        _check(this, pass, "toHaveLength", `${n}`);
+        return new Expect { value: this.value, label: this.label, negated: false };
     }
 
-    fn toBeEmpty(borrow self): Expect {
-        let s: string = `${self.value}`;
-        let actual_len = s.length();
+    function toBeEmpty(): Expect {
+        let actual_len = this.value.length();
         let pass = actual_len == 0;
-        _check(self, pass, "toBeEmpty", "length 0");
-        return Expect { value: self.value, label: self.label, negated: false };
+        _check(this, pass, "toBeEmpty", "length 0");
+        return new Expect { value: this.value, label: this.label, negated: false };
     }
 
     // ── Result / Option ───────────────────────────────────────────────────
 
-    fn toBeOk(borrow self): Expect {
-        let unwrapped = test.ok(self.value);
+    function toBeOk(): Expect {
+        let unwrapped = test.ok(this.value);
         // test.ok already panics if Err — if we reach here it's Ok.
-        return Expect { value: unwrapped, label: self.label, negated: false };
+        return new Expect { value: unwrapped, label: this.label, negated: false };
     }
 
-    fn toBeErr(borrow self): Expect {
-        let unwrapped = test.err(self.value);
-        return Expect { value: unwrapped, label: self.label, negated: false };
+    function toBeErr(): Expect {
+        let unwrapped = test.err(this.value);
+        return new Expect { value: unwrapped, label: this.label, negated: false };
     }
 
-    fn toBeSome(borrow self): Expect {
-        match self.value {
-            Some(v) => return Expect { value: v, label: self.label, negated: false },
+    function toBeSome(): Expect {
+        match this.value {
+            Some(v) => return new Expect { value: v, label: this.label, negated: false },
             None => {
-                let msg = _label(self) + " expected Some but got None";
+                let msg = _label(this) + " expected Some but got None";
                 test.assert(false, msg);
-                return self;
+                return this;
             },
         }
     }
 
-    fn toBeNone(borrow self): Expect {
-        match self.value {
+    function toBeNone(): Expect {
+        match this.value {
             Some(_) => {
-                let msg = _label(self) + " expected None but got Some(...)";
+                let msg = _label(this) + " expected None but got Some(...)";
                 test.assert(false, msg);
-                return self;
+                return this;
             },
-            None => return Expect { value: self.value, label: self.label, negated: false },
+            None => return new Expect { value: this.value, label: this.label, negated: false },
         }
     }
 
     // ── Array ─────────────────────────────────────────────────────────────
 
-    fn toContainItem(borrow self, item: any): Expect {
-        test.contains(self.value, item);
-        return Expect { value: self.value, label: self.label, negated: false };
+    function toContainItem(item: any): Expect {
+        test.contains(this.value, item);
+        return new Expect { value: this.value, label: this.label, negated: false };
     }
 }
 
 // ── Constructor ────────────────────────────────────────────────────────────
 
-export fn expect(value: any): Expect {
-    return Expect { value: value, label: "", negated: false };
+export function expect(value: any): Expect {
+    return new Expect { value: value, label: "", negated: false };
 }
 
 // ── Internals ──────────────────────────────────────────────────────────────
 
-fn _label(e: Expect): string {
+function _label(e: Expect): string {
     if e.label == "" {
         return "expect(" + `${e.value}` + ")";
     }
     return "expect[" + e.label + "](" + `${e.value}` + ")";
 }
 
-fn _check(e: Expect, raw_pass: bool, matcher: string, expected_repr: string): void {
+function _check(e: Expect, raw_pass: bool, matcher: string, expected_repr: string): void {
     let pass = if e.negated { !raw_pass } else { raw_pass };
     if !pass {
         let not_str = if e.negated { ".not()" } else { "" };

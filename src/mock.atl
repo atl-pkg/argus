@@ -32,163 +32,153 @@ export struct Call1 {
 
 // ── Spy (0-arg) ────────────────────────────────────────────────────────────
 
-export struct Spy {
-    call_fn: (): any,
-    calls: Call[],
-}
+export class Spy {
+    call_fn: (): any;
+    calls: Call[];
 
-impl Spy {
-    fn call_count(borrow self): number {
-        return self.calls.length();
+    function call_count(): number {
+        return this.calls.length();
     }
 
-    fn was_called(borrow self): bool {
-        return self.calls.length() > 0;
+    function was_called(): bool {
+        return this.calls.length() > 0;
     }
 
-    fn never_called(borrow self): bool {
-        return self.calls.length() == 0;
+    function never_called(): bool {
+        return this.calls.length() == 0;
     }
 
-    fn last_return(borrow self): any {
-        let len = self.calls.length();
+    function last_return(): any {
+        let len = this.calls.length();
         test.assert(len > 0, "spy was never called — no last_return");
-        return self.calls[len - 1].returned;
+        return this.calls[len - 1].returned;
     }
 
-    fn nth_return(borrow self, n: number): any {
-        test.assert(n >= 0 && n < self.calls.length(), "spy call index out of range: " + n.toString());
-        return self.calls[n].returned;
+    function nth_return(n: number): any {
+        test.assert(n >= 0 && n < this.calls.length(), "spy call index out of range: " + n.toString());
+        return this.calls[n].returned;
     }
 
-    fn returns(borrow self): any[] {
-        return self.calls.map(fn(c: Call): any { return c.returned; });
+    function returns(): any[] {
+        return this.calls.map(fn(c: Call): any { return c.returned; });
     }
 
-    fn reset(borrow self): Spy {
-        return Spy { call_fn: self.call_fn, calls: [] };
+    function reset(): Spy {
+        return new Spy { call_fn: this.call_fn, calls: [] };
     }
 }
 
 // ── Spy1 (1-arg) ──────────────────────────────────────────────────────────
 
-export struct Spy1 {
-    call_fn: (arg: any): any,
-    calls: Call1[],
-}
+export class Spy1 {
+    call_fn: (arg: any): any;
+    calls: Call1[];
 
-impl Spy1 {
-    fn call_count(borrow self): number {
-        return self.calls.length();
+    function call_count(): number {
+        return this.calls.length();
     }
 
-    fn was_called(borrow self): bool {
-        return self.calls.length() > 0;
+    function was_called(): bool {
+        return this.calls.length() > 0;
     }
 
-    fn last_arg(borrow self): any {
-        let len = self.calls.length();
+    function last_arg(): any {
+        let len = this.calls.length();
         test.assert(len > 0, "spy1 was never called — no last_arg");
-        return self.calls[len - 1].arg;
+        return this.calls[len - 1].arg;
     }
 
-    fn last_return(borrow self): any {
-        let len = self.calls.length();
+    function last_return(): any {
+        let len = this.calls.length();
         test.assert(len > 0, "spy1 was never called — no last_return");
-        return self.calls[len - 1].returned;
+        return this.calls[len - 1].returned;
     }
 
-    fn args(borrow self): any[] {
-        return self.calls.map(fn(c: Call1): any { return c.arg; });
+    function args(): any[] {
+        return this.calls.map(fn(c: Call1): any { return c.arg; });
     }
 
-    fn nth_call(borrow self, n: number): Call1 {
-        test.assert(n >= 0 && n < self.calls.length(), "spy1 call index out of range: " + n.toString());
-        return self.calls[n];
+    function nth_call(n: number): Call1 {
+        test.assert(n >= 0 && n < this.calls.length(), "spy1 call index out of range: " + n.toString());
+        return this.calls[n];
     }
 
-    fn called_with(borrow self, arg: any): bool {
-        return self.calls.filter(fn(c: Call1): bool { return c.arg == arg; }).length() > 0;
+    function called_with(arg: any): bool {
+        return this.calls.filter(fn(c: Call1): bool { return c.arg == arg; }).length() > 0;
     }
 
-    fn reset(borrow self): Spy1 {
-        return Spy1 { call_fn: self.call_fn, calls: [] };
+    function reset(): Spy1 {
+        return new Spy1 { call_fn: this.call_fn, calls: [] };
     }
 }
 
 // ── Stub ───────────────────────────────────────────────────────────────────
 
-export struct Stub {
-    call_fn: (): any,
-    call_count: number,
-}
+export class Stub {
+    call_fn: (): any;
+    call_count: number;
 
-impl Stub {
-    fn was_called(borrow self): bool {
-        return self.call_count > 0;
+    function was_called(): bool {
+        return this.call_count > 0;
     }
 
-    fn never_called(borrow self): bool {
-        return self.call_count == 0;
+    function never_called(): bool {
+        return this.call_count == 0;
     }
 }
 
 // ── Verify ─────────────────────────────────────────────────────────────────
 
-export struct Verify {
-    subject: any,
-    label: string,
-}
+export class Verify {
+    subject: any;
+    label: string;
 
-impl Verify {
-    fn calledTimes(borrow self, n: number): Verify {
-        let count = self.subject.call_count();
+    function calledTimes(n: number): Verify {
+        let count = this.subject.call_count();
         test.assert(
             count == n,
-            self.label + ": expected " + n.toString() + " calls, got " + count.toString(),
+            this.label + ": expected " + n.toString() + " calls, got " + count.toString(),
         );
-        return self;
+        return this;
     }
 
-    fn calledAtLeast(borrow self, n: number): Verify {
-        let count = self.subject.call_count();
+    function calledAtLeast(n: number): Verify {
+        let count = this.subject.call_count();
         test.assert(
             count >= n,
-            self.label + ": expected at least " + n.toString() + " calls, got " + count.toString(),
+            this.label + ": expected at least " + n.toString() + " calls, got " + count.toString(),
         );
-        return self;
+        return this;
     }
 
-    fn calledAtMost(borrow self, n: number): Verify {
-        let count = self.subject.call_count();
+    function calledAtMost(n: number): Verify {
+        let count = this.subject.call_count();
         test.assert(
             count <= n,
-            self.label + ": expected at most " + n.toString() + " calls, got " + count.toString(),
+            this.label + ": expected at most " + n.toString() + " calls, got " + count.toString(),
         );
-        return self;
+        return this;
     }
 
-    fn neverCalled(borrow self): Verify {
-        let count = self.subject.call_count();
+    function neverCalled(): Verify {
+        let count = this.subject.call_count();
         test.assert(
             count == 0,
-            self.label + ": expected 0 calls, got " + count.toString(),
+            this.label + ": expected 0 calls, got " + count.toString(),
         );
-        return self;
+        return this;
     }
 
-    fn calledOnce(borrow self): Verify {
-        return self.calledTimes(1);
+    function calledOnce(): Verify {
+        return this.calledTimes(1);
     }
 }
 
 // ── MockNamespace ──────────────────────────────────────────────────────────
 // Zero-field singleton — all factory methods live here.
 
-export struct MockNamespace {}
-
-impl MockNamespace {
-    fn spy(borrow self, target: (): any): Spy {
+export class MockNamespace {
+    function spy(target: (): any): Spy {
         let mut calls: Call[] = [];
         let mut idx = 0;
         let wrapper = fn(): any {
@@ -197,10 +187,10 @@ impl MockNamespace {
             idx = idx + 1;
             return result;
         };
-        return Spy { call_fn: wrapper, calls: calls };
+        return new Spy { call_fn: wrapper, calls: calls };
     }
 
-    fn spy1(borrow self, target: (arg: any): any): Spy1 {
+    function spy1(target: (arg: any): any): Spy1 {
         let mut calls: Call1[] = [];
         let mut idx = 0;
         let wrapper = fn(arg: any): any {
@@ -209,19 +199,19 @@ impl MockNamespace {
             idx = idx + 1;
             return result;
         };
-        return Spy1 { call_fn: wrapper, calls: calls };
+        return new Spy1 { call_fn: wrapper, calls: calls };
     }
 
-    fn stub(borrow self, value: any): Stub {
+    function stub(value: any): Stub {
         let mut count = 0;
         let f = fn(): any {
             count = count + 1;
             return value;
         };
-        return Stub { call_fn: f, call_count: count };
+        return new Stub { call_fn: f, call_count: count };
     }
 
-    fn stubSeq(borrow self, values: any[]): Stub {
+    function stubSeq(values: any[]): Stub {
         test.assert(values.length() > 0, "mock.stubSeq: requires at least one value");
         let mut idx = 0;
         let mut count = 0;
@@ -234,27 +224,27 @@ impl MockNamespace {
             count = count + 1;
             return v;
         };
-        return Stub { call_fn: f, call_count: count };
+        return new Stub { call_fn: f, call_count: count };
     }
 
-    fn stubFn(borrow self, impl_fn: (): any): Stub {
+    function stubFn(impl_fn: (): any): Stub {
         let mut count = 0;
         let f = fn(): any {
             count = count + 1;
             return impl_fn();
         };
-        return Stub { call_fn: f, call_count: count };
+        return new Stub { call_fn: f, call_count: count };
     }
 
-    fn verify(borrow self, subject: any): Verify {
-        return Verify { subject: subject, label: "mock" };
+    function verify(subject: any): Verify {
+        return new Verify { subject: subject, label: "mock" };
     }
 
-    fn verifyAs(borrow self, subject: any, label: string): Verify {
-        return Verify { subject: subject, label: label };
+    function verifyAs(subject: any, label: string): Verify {
+        return new Verify { subject: subject, label: label };
     }
 }
 
 // ── Singleton ──────────────────────────────────────────────────────────────
 
-export let mock: MockNamespace = MockNamespace {};
+export let mock: MockNamespace = new MockNamespace {};
