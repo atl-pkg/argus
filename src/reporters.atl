@@ -84,10 +84,8 @@ export class ReportNamespace {
     function verbose(results: SuiteResult[]): void {
         for r of results {
             console.log(`\n  ${r.name}`);
-            let mut k = 0;
-            while k < r.passed {
-                console.log("    ✓ (passed)");
-                k = k + 1;
+            for name of r.passing {
+                console.log(`    ✓ ${name}`);
             }
             for f of r.failures {
                 console.log(`    ✗ ${f.case_name} — ${f.message}`);

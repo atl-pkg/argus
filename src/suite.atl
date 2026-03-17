@@ -61,6 +61,7 @@ export struct SuiteResult {
     failed: number,
     skipped: number,
     failures: Failure[],
+    passing: string[],
     duration_ms: number,
 }
 
@@ -314,6 +315,7 @@ function _run_suite(suite: Suite, prefix: string): SuiteResult {
     let mut failed = 0;
     let mut skipped = 0;
     let mut failures: Failure[] = [];
+    let mut passing: string[] = [];
     let start_ms = performance.now();
 
     suite.before_all();
@@ -334,6 +336,7 @@ function _run_suite(suite: Suite, prefix: string): SuiteResult {
                 },
                 None => {
                     passed = passed + 1;
+                    passing = passing.push(tc.name);
                 },
             }
         }
@@ -348,6 +351,7 @@ function _run_suite(suite: Suite, prefix: string): SuiteResult {
         failed: failed,
         skipped: skipped,
         failures: failures,
+        passing: passing,
         duration_ms: duration,
     };
 }
