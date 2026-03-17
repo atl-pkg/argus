@@ -11,8 +11,41 @@
 //   expect(user.name).not().toEqual("anonymous");
 //   expect(result).toBeOk();
 //   expect(list).toHaveLength(3).toContain("alice");
+//
+// Custom matchers via the Matcher trait:
+//
+//   import { extendExpect, Matcher } from 'argus';
+//
+//   class IsEvenMatcher {
+//       function name(): string { return "toBeEven"; }
+//       function test(value: any, expected: any): bool { return value % 2 == 0; }
+//       function message(value: any, expected: any): string {
+//           return `expected ${value} to be even`;
+//       }
+//   }
+//   impl Matcher for IsEvenMatcher {}
+//
+//   extendExpect(new IsEvenMatcher {});
+//   expect(4).toCustom("toBeEven", null);   // passes
+//   expect(3).not().toCustom("toBeEven", null);  // passes
 
 import { _capture_failure } from "./suite";
+
+// ── Matcher trait ──────────────────────────────────────────────────────────
+
+export trait Matcher {
+    function name(): string;
+    function test(value: any, expected: any): bool;
+    function message(value: any, expected: any): string;
+}
+
+// Module-level custom matcher registry — keyed by matcher name.
+let mut _custom_matchers: Map<string, Matcher> = new Map<string, Matcher>();
+
+// extendExpect — register a custom matcher. Call before your describe() blocks.
+export function extendExpect(m: Matcher): void {
+    _custom_matchers = _custom_matchers.set(m.name(), m);
+}
 
 // ── Core class ─────────────────────────────────────────────────────────────
 
@@ -177,6 +210,32 @@ export class Expect {
         }
     }
 
+    // ── Custom matchers ───────────────────────────────────────────────────
+
+    // toCustom — invoke a matcher registered via extendExpect().
+    // Respects .not() negation via _check().
+    //
+    //   extendExpect(new IsEvenMatcher {});
+    //   expect(4).toCustom("toBeEven", null);
+    //   expect(3).not().toCustom("toBeEven", null);
+    function toCustom(matcherName: string, expected: any): Expect {
+        let m = _custom_matchers.get(matcherName);
+        match m {
+            None => {
+                let msg = "unknown matcher: " + matcherName + " — did you call extendExpect()?";
+                _capture_failure(msg);
+                test.assert(false, msg);
+                return this;
+            },
+            Some(matcher) => {
+                let pass = matcher.test(this.value, expected);
+                let fail_msg = matcher.message(this.value, expected);
+                _check_custom(this, pass, matcherName, fail_msg);
+                return new Expect { value: this.value, label: this.label, negated: false };
+            },
+        }
+    }
+
     // ── Array ─────────────────────────────────────────────────────────────
 
     function toContainItem(item: any): Expect {
@@ -226,6 +285,18 @@ function _check(e: Expect, raw_pass: bool, matcher: string, expected_repr: strin
         let msg = base_msg;
         // Record the message in the runner's capture bridge BEFORE panicking,
         // so test.noThrow can catch the panic and the runner still has the message.
+        _capture_failure(msg);
+        test.assert(false, msg);
+    }
+}
+
+// _check_custom — used by toCustom. The matcher provides its own failure message
+//                 so we use that directly (with negation prefix if needed).
+function _check_custom(e: Expect, raw_pass: bool, matcher_name: string, fail_msg: string): void {
+    let pass = if e.negated { !raw_pass } else { raw_pass };
+    if !pass {
+        let not_str = if e.negated { ".not()" } else { "" };
+        let msg = _label(e) + not_str + ".toCustom(\"" + matcher_name + "\") — " + fail_msg;
         _capture_failure(msg);
         test.assert(false, msg);
     }

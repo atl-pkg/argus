@@ -24,6 +24,8 @@ export {
 export {
     expect,
     Expect,
+    Matcher,
+    extendExpect,
 } from "./src/expect";
 
 // Mock — namespace singleton + types for annotations
