@@ -33,6 +33,7 @@ export struct TestCase {
     name: string,
     run: fn(): void,
     skip: bool,
+    focus: bool,
     tags: string[],
     timeout_ms: number,
     retry: number,
@@ -82,6 +83,10 @@ let mut _stack: Suite[] = [];
 
 // Active tag filter — set via filterTags(). Empty = run all.
 let mut _tag_filter: string[] = [];
+
+// Focus mode — set to true when itOnly() or describeOnly() is called.
+// When true, the runner skips all cases where focus=false.
+let mut _focus_mode: bool = false;
 
 function _no_op(): void {}
 
@@ -160,9 +165,48 @@ export function describeTags(name: string, tags: string[], builder: fn(): void):
     _root_suites = _root_suites.push(suite);
 }
 
+// describeOnly — focused describe block. Sets focus mode; all it() cases
+// inside are registered as focused. Non-focused suites still run, but their
+// cases are skipped in focus mode (unless also marked with itOnly).
+export function describeOnly(name: string, builder: fn(): void): void {
+    _focus_mode = true;
+    _push_suite(name, _tag_filter.slice(0, 0));
+    builder();
+    let suite = _pop_suite();
+    // Mark all cases in this suite as focused.
+    let focused_cases = suite.cases.map(fn(tc: TestCase): TestCase {
+        return TestCase {
+            name: tc.name,
+            run: tc.run,
+            skip: tc.skip,
+            focus: true,
+            tags: tc.tags,
+            timeout_ms: tc.timeout_ms,
+            retry: tc.retry,
+        };
+    });
+    let focused_suite = Suite {
+        name: suite.name,
+        cases: focused_cases,
+        before_each: suite.before_each,
+        after_each: suite.after_each,
+        before_all: suite.before_all,
+        after_all: suite.after_all,
+        tags: suite.tags,
+    };
+    _root_suites = _root_suites.push(focused_suite);
+}
+
 // it — define a single test case.
 export function it(name: string, run: fn(): void): void {
-    _register_case(name, run, false, _tag_filter.slice(0, 0), 5000, 0);
+    _register_case(name, run, false, false, _tag_filter.slice(0, 0), 5000, 0);
+}
+
+// itOnly — define a focused test case. When any itOnly/describeOnly exists,
+// only focused cases run. All other it() cases are skipped.
+export function itOnly(name: string, run: fn(): void): void {
+    _focus_mode = true;
+    _register_case(name, run, false, true, _tag_filter.slice(0, 0), 5000, 0);
 }
 
 // it with options: tags, timeout, retry.
@@ -173,12 +217,12 @@ export function itOpts(
     timeout_ms: number,
     retry: number,
 ): void {
-    _register_case(name, run, false, tags, timeout_ms, retry);
+    _register_case(name, run, false, false, tags, timeout_ms, retry);
 }
 
 // xit — skip a test case (mark pending).
 export function xit(name: string, run: fn(): void): void {
-    _register_case(name, run, true, _tag_filter.slice(0, 0), 5000, 0);
+    _register_case(name, run, true, false, _tag_filter.slice(0, 0), 5000, 0);
 }
 
 // each — parametric tests. Calls builder once per row, with the row as context.
@@ -221,6 +265,7 @@ function _register_case(
     name: string,
     run: fn(): void,
     skip: bool,
+    focus: bool,
     tags: string[],
     timeout_ms: number,
     retry: number,
@@ -229,6 +274,7 @@ function _register_case(
         name: name,
         run: run,
         skip: skip,
+        focus: focus,
         tags: tags,
         timeout_ms: timeout_ms,
         retry: retry,
@@ -273,7 +319,7 @@ function _run_suite(suite: Suite, prefix: string): SuiteResult {
     suite.before_all();
 
     for tc of suite.cases {
-        if tc.skip || !_tags_match(tc.tags) {
+        if tc.skip || !_tags_match(tc.tags) || (_focus_mode && !tc.focus) {
             skipped = skipped + 1;
         } else {
             let result = _run_case(tc, suite.before_each, suite.after_each);
@@ -333,4 +379,5 @@ export function reset(): void {
     _root_suites = _root_suites.slice(0, 0);
     _stack = _stack.slice(0, 0);
     _tag_filter = _tag_filter.slice(0, 0);
+    _focus_mode = false;
 }

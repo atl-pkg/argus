@@ -13,8 +13,8 @@
 
 // Suite — bare imports (test structure reads best without a prefix)
 export {
-    describe, describeTags,
-    it, itOpts, xit, each,
+    describe, describeTags, describeOnly,
+    it, itOnly, itOpts, xit, each,
     beforeEach, afterEach, beforeAll, afterAll,
     run, runAndExit, reset, filterTags,
     Suite, TestCase, SuiteResult, Failure,
