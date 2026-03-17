@@ -30,41 +30,67 @@ export struct Call1 {
     returned: any,
 }
 
+// ── Shared call registries ─────────────────────────────────────────────────
+// These are module-level Maps — closures read/write them by key at call time,
+// not via captured-by-value snapshots. This is the fix for the spy.calls bug:
+// closures write to the live registry; introspection methods read from it.
+
+let mut _spy_registry: Map<string, Call[]> = new Map<string, Call[]>();
+let mut _spy1_registry: Map<string, Call1[]> = new Map<string, Call1[]>();
+let mut _stub_registry: Map<string, number> = new Map<string, number>();
+let mut _id_counter: number = 0;
+
+function _next_id(): string {
+    let id = "m" + _id_counter.toString();
+    _id_counter = _id_counter + 1;
+    return id;
+}
+
 // ── Spy (0-arg) ────────────────────────────────────────────────────────────
 
 export class Spy {
     call_fn: (): any;
-    calls: Call[];
+    _id: string;
 
     function call_count(): number {
-        return this.calls.length();
+        return _spy_registry.get(this._id).unwrapOr([]).length();
     }
 
     function was_called(): bool {
-        return this.calls.length() > 0;
+        return this.call_count() > 0;
     }
 
     function never_called(): bool {
-        return this.calls.length() == 0;
+        return this.call_count() == 0;
+    }
+
+    // calls() returns the live call record list from the shared registry.
+    function calls(): Call[] {
+        return _spy_registry.get(this._id).unwrapOr([]);
     }
 
     function last_return(): any {
-        let len = this.calls.length();
+        let cs = this.calls();
+        let len = cs.length();
         test.assert(len > 0, "spy was never called — no last_return");
-        return this.calls[len - 1].returned;
+        return cs[len - 1].returned;
     }
 
     function nth_return(n: number): any {
-        test.assert(n >= 0 && n < this.calls.length(), "spy call index out of range: " + n.toString());
-        return this.calls[n].returned;
+        let cs = this.calls();
+        test.assert(n >= 0 && n < cs.length(), "spy call index out of range: " + n.toString());
+        return cs[n].returned;
     }
 
     function returns(): any[] {
-        return this.calls.map(fn(c: Call): any { return c.returned; });
+        return this.calls().map(fn(c: Call): any { return c.returned; });
     }
 
+    // reset — clears call history; returns a new Spy with a fresh registry entry.
     function reset(): Spy {
-        return new Spy { call_fn: this.call_fn, calls: [] };
+        let new_id = _next_id();
+        _spy_registry = _spy_registry.set(new_id, []);
+        return new Spy { call_fn: this.call_fn, _id: new_id };
     }
 }
 
@@ -72,43 +98,53 @@ export class Spy {
 
 export class Spy1 {
     call_fn: (arg: any): any;
-    calls: Call1[];
+    _id: string;
 
     function call_count(): number {
-        return this.calls.length();
+        return _spy1_registry.get(this._id).unwrapOr([]).length();
     }
 
     function was_called(): bool {
-        return this.calls.length() > 0;
+        return this.call_count() > 0;
+    }
+
+    // calls() returns the live call record list from the shared registry.
+    function calls(): Call1[] {
+        return _spy1_registry.get(this._id).unwrapOr([]);
     }
 
     function last_arg(): any {
-        let len = this.calls.length();
+        let cs = this.calls();
+        let len = cs.length();
         test.assert(len > 0, "spy1 was never called — no last_arg");
-        return this.calls[len - 1].arg;
+        return cs[len - 1].arg;
     }
 
     function last_return(): any {
-        let len = this.calls.length();
+        let cs = this.calls();
+        let len = cs.length();
         test.assert(len > 0, "spy1 was never called — no last_return");
-        return this.calls[len - 1].returned;
+        return cs[len - 1].returned;
     }
 
     function args(): any[] {
-        return this.calls.map(fn(c: Call1): any { return c.arg; });
+        return this.calls().map(fn(c: Call1): any { return c.arg; });
     }
 
     function nth_call(n: number): Call1 {
-        test.assert(n >= 0 && n < this.calls.length(), "spy1 call index out of range: " + n.toString());
-        return this.calls[n];
+        let cs = this.calls();
+        test.assert(n >= 0 && n < cs.length(), "spy1 call index out of range: " + n.toString());
+        return cs[n];
     }
 
     function called_with(arg: any): bool {
-        return this.calls.filter(fn(c: Call1): bool { return c.arg == arg; }).length() > 0;
+        return this.calls().filter(fn(c: Call1): bool { return c.arg == arg; }).length() > 0;
     }
 
     function reset(): Spy1 {
-        return new Spy1 { call_fn: this.call_fn, calls: [] };
+        let new_id = _next_id();
+        _spy1_registry = _spy1_registry.set(new_id, []);
+        return new Spy1 { call_fn: this.call_fn, _id: new_id };
     }
 }
 
@@ -116,14 +152,18 @@ export class Spy1 {
 
 export class Stub {
     call_fn: (): any;
-    call_count: number;
+    _id: string;
+
+    function call_count(): number {
+        return _stub_registry.get(this._id).unwrapOr(0);
+    }
 
     function was_called(): bool {
-        return this.call_count > 0;
+        return this.call_count() > 0;
     }
 
     function never_called(): bool {
-        return this.call_count == 0;
+        return this.call_count() == 0;
     }
 }
 
@@ -175,65 +215,72 @@ export class Verify {
 }
 
 // ── MockNamespace ──────────────────────────────────────────────────────────
-// Zero-field singleton — all factory methods live here.
 
 export class MockNamespace {
     function spy(target: (): any): Spy {
-        let mut calls: Call[] = [];
-        let mut idx = 0;
+        let id = _next_id();
+        _spy_registry = _spy_registry.set(id, []);
+        // Closure captures `id` (immutable string) and `target` by value.
+        // Reads/writes _spy_registry directly as a module-level global —
+        // NOT a captured local, so mutations persist across calls.
         let wrapper = fn(): any {
             let result = target();
-            calls = calls.push(Call { index: idx, returned: result });
-            idx = idx + 1;
+            let current = _spy_registry.get(id).unwrapOr([]);
+            let call_idx = current.length();
+            _spy_registry = _spy_registry.set(id, current.push(Call { index: call_idx, returned: result }));
             return result;
         };
-        return new Spy { call_fn: wrapper, calls: calls };
+        return new Spy { call_fn: wrapper, _id: id };
     }
 
     function spy1(target: (arg: any): any): Spy1 {
-        let mut calls: Call1[] = [];
-        let mut idx = 0;
+        let id = _next_id();
+        _spy1_registry = _spy1_registry.set(id, []);
         let wrapper = fn(arg: any): any {
             let result = target(arg);
-            calls = calls.push(Call1 { index: idx, arg: arg, returned: result });
-            idx = idx + 1;
+            let current = _spy1_registry.get(id).unwrapOr([]);
+            let call_idx = current.length();
+            _spy1_registry = _spy1_registry.set(id, current.push(Call1 { index: call_idx, arg: arg, returned: result }));
             return result;
         };
-        return new Spy1 { call_fn: wrapper, calls: calls };
+        return new Spy1 { call_fn: wrapper, _id: id };
     }
 
     function stub(value: any): Stub {
-        let mut count = 0;
+        let id = _next_id();
+        _stub_registry = _stub_registry.set(id, 0);
         let f = fn(): any {
-            count = count + 1;
+            let current = _stub_registry.get(id).unwrapOr(0);
+            _stub_registry = _stub_registry.set(id, current + 1);
             return value;
         };
-        return new Stub { call_fn: f, call_count: count };
+        return new Stub { call_fn: f, _id: id };
     }
 
     function stubSeq(values: any[]): Stub {
         test.assert(values.length() > 0, "mock.stubSeq: requires at least one value");
-        let mut idx = 0;
-        let mut count = 0;
+        let id = _next_id();
+        _stub_registry = _stub_registry.set(id, 0);
         let last = values.length() - 1;
+        // idx captured by value — use _stub_registry count as the sequence index.
         let f = fn(): any {
-            let v = values[idx];
-            if idx < last {
-                idx = idx + 1;
-            }
-            count = count + 1;
-            return v;
+            let count = _stub_registry.get(id).unwrapOr(0);
+            let seq_idx = if count < last { count } else { last };
+            _stub_registry = _stub_registry.set(id, count + 1);
+            return values[seq_idx];
         };
-        return new Stub { call_fn: f, call_count: count };
+        return new Stub { call_fn: f, _id: id };
     }
 
     function stubFn(impl_fn: (): any): Stub {
-        let mut count = 0;
+        let id = _next_id();
+        _stub_registry = _stub_registry.set(id, 0);
         let f = fn(): any {
-            count = count + 1;
+            let current = _stub_registry.get(id).unwrapOr(0);
+            _stub_registry = _stub_registry.set(id, current + 1);
             return impl_fn();
         };
-        return new Stub { call_fn: f, call_count: count };
+        return new Stub { call_fn: f, _id: id };
     }
 
     function verify(subject: any): Verify {
