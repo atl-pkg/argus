@@ -12,8 +12,27 @@
 //   report.json(results);      // JSON: { summary, suites } to stdout
 //
 //   let s = report.summarize(results);  // → RunSummary
+//
+// Custom reporters via the Reporter trait:
+//
+//   import { Reporter, runWith } from 'argus';
+//
+//   class MyReporter {
+//       function report(results: SuiteResult[]): void {
+//           // custom output
+//       }
+//   }
+//   impl Reporter for MyReporter {}
+//
+//   runWith(new MyReporter {});
 
-import { SuiteResult, Failure } from "./suite";
+import { SuiteResult, Failure, run } from "./suite";
+
+// ── Reporter trait ─────────────────────────────────────────────────────────
+
+export trait Reporter {
+    function report(results: SuiteResult[]): void;
+}
 
 // ── RunSummary ─────────────────────────────────────────────────────────────
 
@@ -180,3 +199,12 @@ export class ReportNamespace {
 // ── Singleton ──────────────────────────────────────────────────────────────
 
 export let report: ReportNamespace = new ReportNamespace {};
+
+// runWith — run all registered suites and pass results to a custom Reporter.
+// The Reporter trait is the extension point for CI tools and custom output.
+//
+//   runWith(new MyJunitReporter {});
+export function runWith(reporter: Reporter): void {
+    let results = run();
+    reporter.report(results);
+}

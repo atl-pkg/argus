@@ -39,11 +39,13 @@ export {
     SnapshotNamespace,
 } from "./src/snapshot";
 
-// Report — namespace singleton + summary type
+// Report — namespace singleton + summary type + extension trait
 export {
     report,
     ReportNamespace,
     RunSummary,
+    Reporter,
+    runWith,
 } from "./src/reporters";
 
 // Fixtures — bare imports (already scoped by name)
